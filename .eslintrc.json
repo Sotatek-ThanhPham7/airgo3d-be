@@ -16,6 +16,7 @@
   "rules": {
     "node/no-unsupported-features/es-syntax": ["error", { "ignores": ["modules"] }],
     "@typescript-eslint/explicit-function-return-type": "off",
-    "@typescript-eslint/no-explicit-any": "off"
+    "@typescript-eslint/no-explicit-any": "off",
+    "no-process-exit": "off"
   }
 }

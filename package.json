@@ -10,6 +10,8 @@
     "up": "docker-compose up"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.948.0",
+    "@aws-sdk/s3-request-presigner": "^3.948.0",
     "@types/morgan": "^1.9.2",
     "@types/node": "14.0.0",
     "cors": "^2.8.5",
@@ -17,13 +19,18 @@
     "express": "^4.17.1",
     "mongoose": "^9.0.1",
     "morgan": "^1.10.0",
+    "multer": "^2.0.2",
     "pm2": "^4.5.6",
+    "sharp": "^0.34.5",
     "typescript": "^4.2.4",
+    "uuid": "^13.0.0",
     "winston": "^3.3.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.10",
     "@types/express": "^4.17.11",
+    "@types/multer": "^2.0.0",
+    "@types/uuid": "^11.0.0",
     "@typescript-eslint/eslint-plugin": "^4.22.0",
     "@typescript-eslint/parser": "^4.22.0",
     "eslint": "^7.25.0",

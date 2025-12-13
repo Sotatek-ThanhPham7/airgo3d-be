@@ -17,6 +17,15 @@
     "node/no-unsupported-features/es-syntax": ["error", { "ignores": ["modules"] }],
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/no-explicit-any": "off",
-    "no-process-exit": "off"
-  }
+    "no-process-exit": "off",
+    "node/no-missing-import": "off"
+  },
+  "overrides": [
+    {
+      "files": ["scripts/**/*.ts"],
+      "rules": {
+        "node/no-unsupported-features/es-syntax": "off"
+      }
+    }
+  ]
 }

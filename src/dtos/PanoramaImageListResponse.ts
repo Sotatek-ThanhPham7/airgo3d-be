@@ -13,7 +13,7 @@ export class PanoramaImageItemDto {
   width?: number;
   height?: number;
   isBookmarked: boolean;
-  uploadedAt: Date;
+  createdAt: Date;
   updatedAt: Date;
   metadata?: {
     camera?: string;
@@ -35,7 +35,7 @@ export class PanoramaImageItemDto {
     this.width = panoramaImage.width;
     this.height = panoramaImage.height;
     this.isBookmarked = panoramaImage.isBookmarked;
-    this.uploadedAt = panoramaImage.uploadedAt;
+    this.createdAt = panoramaImage.createdAt;
     this.updatedAt = panoramaImage.updatedAt;
     this.metadata = panoramaImage.metadata;
   }

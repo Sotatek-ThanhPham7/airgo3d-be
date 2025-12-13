@@ -1,7 +1,14 @@
 import { Router, Request, Response } from "express";
+import * as dayjsModule from "dayjs";
+const dayjs = dayjsModule as any;
 import PanoramaImage from "../models/PanoramaImage";
 import { CreatePanoramaImageRequest } from "../dtos/CreatePanoramaImageRequest";
 import { PanoramaImageItemDto } from "../dtos/PanoramaImageListResponse";
+import {
+  BookmarkAnalyticsResponse,
+  BookmarkAnalyticsSummary,
+  TimeSeriesDataPoint,
+} from "../dtos/BookmarkAnalyticsResponse";
 import logger from "../logger";
 
 const router = Router();
@@ -34,7 +41,7 @@ const router = Router();
  *   width?: number
  *   height?: number
  *   isBookmarked: boolean
- *   uploadedAt: Date
+ *   createdAt: Date
  *   updatedAt: Date
  *   metadata?: object
  * }
@@ -197,7 +204,7 @@ router.post("/", async (req: Request, res: Response) => {
  *   width?: number
  *   height?: number
  *   isBookmarked: boolean
- *   uploadedAt: Date
+ *   createdAt: Date
  *   updatedAt: Date
  *   metadata?: object
  * }
@@ -265,6 +272,231 @@ router.patch("/:id/bookmark", async (req: Request, res: Response) => {
     // Generic server error
     res.status(500).json({
       error: "Failed to update bookmark status",
+      message: error.message || "Internal server error",
+    });
+  }
+});
+
+/**
+ * GET /api/panorama/analytics
+ * Get analytics data about bookmarked/un-bookmarked images over time
+ *
+ * Query parameters:
+ * - startDate (optional): ISO date string - Start date for filtering
+ * - endDate (optional): ISO date string - End date for filtering
+ * - period (optional): "day" | "week" | "month" - Aggregation period (default: "day")
+ *
+ * Response:
+ * {
+ *   summary: {
+ *     totalImages: number,
+ *     bookmarkedCount: number,
+ *     unbookmarkedCount: number,
+ *     bookmarkedPercentage: number,
+ *     unbookmarkedPercentage: number
+ *   },
+ *   timeSeries: [
+ *     {
+ *       date: string,
+ *       bookmarked: number,
+ *       unbookmarked: number,
+ *       total: number
+ *     }
+ *   ],
+ *   period: string,
+ *   startDate?: Date,
+ *   endDate?: Date
+ * }
+ */
+router.get("/analytics", async (req: Request, res: Response) => {
+  try {
+    const { startDate, endDate, period = "day" } = req.query;
+
+    // Validate period parameter
+    const validPeriods = ["day", "week", "month"];
+    if (period && !validPeriods.includes(period as string)) {
+      return res.status(400).json({
+        error: `Invalid 'period' parameter. Must be one of: ${validPeriods.join(
+          ", "
+        )}`,
+      });
+    }
+
+    // Parse and validate dates using dayjs
+    let startDateObj: Date | undefined;
+    let endDateObj: Date | undefined;
+
+    if (startDate) {
+      const parsedStartDate = dayjs(startDate as string);
+      if (!parsedStartDate.isValid()) {
+        return res.status(400).json({
+          error: "Invalid 'startDate' format. Must be a valid ISO date string.",
+        });
+      }
+      startDateObj = parsedStartDate.startOf("day").toDate();
+    }
+
+    if (endDate) {
+      const parsedEndDate = dayjs(endDate as string);
+      if (!parsedEndDate.isValid()) {
+        return res.status(400).json({
+          error: "Invalid 'endDate' format. Must be a valid ISO date string.",
+        });
+      }
+      // Set end date to end of day
+      endDateObj = parsedEndDate.endOf("day").toDate();
+    }
+
+    // Validate date range
+    if (startDateObj && endDateObj && dayjs(startDateObj).isAfter(endDateObj)) {
+      return res.status(400).json({
+        error: "'startDate' must be before or equal to 'endDate'.",
+      });
+    }
+
+    // Build date format string based on period
+    let dateFormatString: string;
+    switch (period) {
+      case "week":
+        dateFormatString = "%Y-W%V"; // ISO week format: YYYY-Www
+        break;
+      case "month":
+        dateFormatString = "%Y-%m"; // YYYY-MM
+        break;
+      case "day":
+      default:
+        dateFormatString = "%Y-%m-%d"; // YYYY-MM-DD
+        break;
+    }
+
+    // Build aggregation pipeline
+    const pipeline: any[] = [];
+
+    // Match stage: filter by date range if provided
+    const matchStage: any = {};
+    if (startDateObj || endDateObj) {
+      matchStage.createdAt = {};
+      if (startDateObj) {
+        matchStage.createdAt.$gte = startDateObj;
+      }
+      if (endDateObj) {
+        matchStage.createdAt.$lte = endDateObj;
+      }
+      pipeline.push({ $match: matchStage });
+    }
+
+    // Group stage: group by date period and bookmark status
+    pipeline.push({
+      $group: {
+        _id: {
+          date: {
+            $dateToString: {
+              format: dateFormatString,
+              date: "$createdAt",
+            },
+          },
+          isBookmarked: "$isBookmarked",
+        },
+        count: { $sum: 1 },
+      },
+    });
+
+    // Sort by date
+    pipeline.push({
+      $sort: { "_id.date": 1 },
+    });
+
+    // Execute aggregation
+    const aggregationResult = await PanoramaImage.aggregate(pipeline);
+
+    // Transform aggregation results to time series format and calculate summary
+    const timeSeriesMap = new Map<
+      string,
+      { bookmarked: number; unbookmarked: number }
+    >();
+    let bookmarkedCount = 0;
+    let unbookmarkedCount = 0;
+
+    aggregationResult.forEach((item) => {
+      const date = item._id.date;
+      const isBookmarked = item._id.isBookmarked;
+      const count = item.count;
+
+      // Accumulate counts for summary
+      if (isBookmarked) {
+        bookmarkedCount += count;
+      } else {
+        unbookmarkedCount += count;
+      }
+
+      // Build time series map
+      if (!timeSeriesMap.has(date)) {
+        timeSeriesMap.set(date, { bookmarked: 0, unbookmarked: 0 });
+      }
+
+      const dateData = timeSeriesMap.get(date);
+      if (dateData) {
+        if (isBookmarked) {
+          dateData.bookmarked = count;
+        } else {
+          dateData.unbookmarked = count;
+        }
+      }
+    });
+
+    // Calculate summary statistics
+    const totalImages = bookmarkedCount + unbookmarkedCount;
+    const bookmarkedPercentage =
+      totalImages > 0
+        ? Math.round((bookmarkedCount / totalImages) * 100 * 100) / 100
+        : 0;
+    const unbookmarkedPercentage =
+      totalImages > 0
+        ? Math.round((unbookmarkedCount / totalImages) * 100 * 100) / 100
+        : 0;
+
+    const summary: BookmarkAnalyticsSummary = {
+      totalImages,
+      bookmarkedCount,
+      unbookmarkedCount,
+      bookmarkedPercentage,
+      unbookmarkedPercentage,
+    };
+
+    // Convert map to array and sort by date
+    const timeSeries: TimeSeriesDataPoint[] = Array.from(
+      timeSeriesMap.entries()
+    )
+      .map(([date, data]) => ({
+        date,
+        bookmarked: data.bookmarked,
+        unbookmarked: data.unbookmarked,
+        total: data.bookmarked + data.unbookmarked,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Create response
+    const response = new BookmarkAnalyticsResponse(
+      summary,
+      timeSeries,
+      period as string,
+      startDateObj,
+      endDateObj
+    );
+
+    logger.info(
+      `Retrieved bookmark analytics: period=${period}, total=${totalImages}, dateRange=${
+        startDateObj ? startDateObj.toISOString() : "none"
+      }-${endDateObj ? endDateObj.toISOString() : "none"}`
+    );
+
+    res.status(200).json(response);
+  } catch (error: any) {
+    logger.error(`Error retrieving bookmark analytics: ${error}`);
+
+    // Generic server error
+    res.status(500).json({
+      error: "Failed to retrieve bookmark analytics",
       message: error.message || "Internal server error",
     });
   }

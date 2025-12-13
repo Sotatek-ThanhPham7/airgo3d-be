@@ -10,7 +10,7 @@ export interface IPanoramaImage extends Document {
   width?: number;
   height?: number;
   isBookmarked: boolean;
-  uploadedAt: Date;
+  createdAt: Date;
   updatedAt: Date;
   metadata?: {
     camera?: string;
@@ -73,13 +73,13 @@ const PanoramaImageSchema: Schema = new Schema(
     },
   },
   {
-    timestamps: true, // Automatically adds uploadedAt and updatedAt
+    timestamps: true,
   }
 );
 
 // Compound index for search and filter combinations
-PanoramaImageSchema.index({ name: "text" }); // Text search on name
-PanoramaImageSchema.index({ isBookmarked: 1, uploadedAt: -1 }); // For filtering and sorting
+PanoramaImageSchema.index({ name: "text" });
+PanoramaImageSchema.index({ isBookmarked: 1, createdAt: -1 });
 
 const PanoramaImage = mongoose.model<IPanoramaImage>(
   "PanoramaImage",
@@ -87,4 +87,3 @@ const PanoramaImage = mongoose.model<IPanoramaImage>(
 );
 
 export default PanoramaImage;
-

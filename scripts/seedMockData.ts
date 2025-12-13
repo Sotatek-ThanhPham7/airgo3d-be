@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import * as dotenv from "dotenv";
-import * as dayjsModule from "dayjs";
-const dayjs = dayjsModule as any;
+import * as dayjs from "dayjs";
 import PanoramaImage from "../src/models/PanoramaImage";
 import { v4 as uuidv4 } from "uuid";
 
@@ -115,7 +114,7 @@ async function seedDatabase() {
     console.log(`Cleared ${deleteResult.deletedCount} existing documents`);
 
     // Generate mock data
-    const numberOfImages = 150; // Generate 150 images
+    const numberOfImages = 20; // Generate 20 images
     const mockImages = [];
 
     console.log(`Generating ${numberOfImages} mock images...`);

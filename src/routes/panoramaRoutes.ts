@@ -343,7 +343,6 @@ router.get("/analytics", async (req: Request, res: Response) => {
           error: "Invalid 'endDate' format. Must be a valid ISO date string.",
         });
       }
-      // Set end date to end of day
       endDateObj = parsedEndDate.endOf("day").toDate();
     }
 
@@ -401,6 +400,9 @@ router.get("/analytics", async (req: Request, res: Response) => {
       },
     });
 
+    // TODO: Raw query instead of manually calc the summary
+    // pipeline.push({})
+
     // Sort by date
     pipeline.push({
       $sort: { "_id.date": 1 },
@@ -408,6 +410,8 @@ router.get("/analytics", async (req: Request, res: Response) => {
 
     // Execute aggregation
     const aggregationResult = await PanoramaImage.aggregate(pipeline);
+
+    console.log({ aggregationResult });
 
     // Transform aggregation results to time series format and calculate summary
     const timeSeriesMap = new Map<

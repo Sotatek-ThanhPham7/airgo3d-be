@@ -119,31 +119,24 @@ Create a new PanoramaImage record in the database after successfully uploading a
 {
   "key": "images/photo-123-550e8400-e29b-41d4-a716-446655440000",
   "name": "Beautiful Panorama",
-  "originalFilename": "panorama.jpg",
   "fileSize": 2048576,
   "mimeType": "image/jpeg",
-  "width": 3840,
-  "height": 2160,
-  "metadata": {
-    "camera": "Canon EOS R5",
-    "location": "Mountain View",
-    "tags": ["nature", "panorama"],
-    "description": "A beautiful panoramic view"
-  }
+  "description": "A beautiful panoramic view",
+  "tags": ["nature", "panorama"]
 }
 ```
 
 **Required Fields:**
+
 - `key` - S3 object key/path from the upload
 - `name` - Display name for the image
-- `originalFilename` - Original filename from client
 - `fileSize` - File size in bytes (must be >= 0)
 - `mimeType` - MIME type (must be one of: `image/jpeg`, `image/png`, `image/jpg`, `image/webp`)
 
 **Optional Fields:**
-- `width` - Image width in pixels
-- `height` - Image height in pixels
-- `metadata` - Object containing optional metadata (camera, location, tags, description)
+
+- `description` - Optional description for the image
+- `tags` - Optional array of tag names (will be created if they don't exist)
 
 **Response:**
 
@@ -152,39 +145,39 @@ Create a new PanoramaImage record in the database after successfully uploading a
   "_id": "507f1f77bcf86cd799439011",
   "name": "Beautiful Panorama",
   "filename": "photo-123-550e8400-e29b-41d4-a716-446655440000",
-  "originalFilename": "panorama.jpg",
   "filePath": "images/photo-123-550e8400-e29b-41d4-a716-446655440000",
   "fileSize": 2048576,
   "mimeType": "image/jpeg",
-  "width": 3840,
-  "height": 2160,
   "isBookmarked": false,
-  "uploadedAt": "2024-01-15T10:30:00.000Z",
-  "updatedAt": "2024-01-15T10:30:00.000Z",
-  "metadata": {
-    "camera": "Canon EOS R5",
-    "location": "Mountain View",
-    "tags": ["nature", "panorama"],
-    "description": "A beautiful panoramic view"
-  }
+  "description": "A beautiful panoramic view",
+  "tags": [
+    {
+      "_id": "507f1f77bcf86cd799439012",
+      "name": "nature"
+    },
+    {
+      "_id": "507f1f77bcf86cd799439013",
+      "name": "panorama"
+    }
+  ],
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "updatedAt": "2024-01-15T10:30:00.000Z"
 }
 ```
 
 **Example Usage:**
 
 ```bash
-# Create PanoramaImage with full metadata
+# Create PanoramaImage with description and tags
 curl -X POST http://localhost:3000/api/panorama \
   -H "Content-Type: application/json" \
   -d '{
     "key": "images/photo-123-550e8400-e29b-41d4-a716-446655440000",
     "name": "My Panorama",
-    "originalFilename": "panorama.jpg",
     "fileSize": 2048576,
     "mimeType": "image/jpeg",
-    "width": 3840,
-    "height": 2160
-  }'
+    "description": "A beautiful panoramic view",
+    "tags": ["nature", "panorama"]
 ```
 
 **Note:** The `filename` field is automatically extracted from the S3 `key` (the last segment after the final `/`).
@@ -196,6 +189,7 @@ curl -X POST http://localhost:3000/api/panorama \
 Update the bookmark status of a PanoramaImage.
 
 **URL Parameters:**
+
 - `id` (required) - MongoDB document ID of the PanoramaImage
 
 **Request Body:**
@@ -215,21 +209,23 @@ Update the bookmark status of a PanoramaImage.
   "_id": "507f1f77bcf86cd799439011",
   "name": "Beautiful Panorama",
   "filename": "photo-123-550e8400-e29b-41d4-a716-446655440000",
-  "originalFilename": "panorama.jpg",
   "filePath": "images/photo-123-550e8400-e29b-41d4-a716-446655440000",
   "fileSize": 2048576,
   "mimeType": "image/jpeg",
-  "width": 3840,
-  "height": 2160,
   "isBookmarked": true,
-  "uploadedAt": "2024-01-15T10:30:00.000Z",
-  "updatedAt": "2024-01-15T10:35:00.000Z",
-  "metadata": {
-    "camera": "Canon EOS R5",
-    "location": "Mountain View",
-    "tags": ["nature", "panorama"],
-    "description": "A beautiful panoramic view"
-  }
+  "description": "A beautiful panoramic view",
+  "tags": [
+    {
+      "_id": "507f1f77bcf86cd799439012",
+      "name": "nature"
+    },
+    {
+      "_id": "507f1f77bcf86cd799439013",
+      "name": "panorama"
+    }
+  ],
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "updatedAt": "2024-01-15T10:35:00.000Z"
 }
 ```
 

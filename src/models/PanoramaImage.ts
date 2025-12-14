@@ -3,40 +3,23 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IPanoramaImage extends Document {
   name: string;
   filename: string;
-  originalFilename: string;
   filePath: string;
   fileSize: number; // in bytes
   mimeType: string;
-  width?: number;
-  height?: number;
   isBookmarked: boolean;
+  description?: string;
+  tags?: mongoose.Types.ObjectId[] | Array<{ _id: mongoose.Types.ObjectId; name: string }>;
   createdAt: Date;
   updatedAt: Date;
-  metadata?: {
-    camera?: string;
-    location?: string;
-    tags?: string[];
-    description?: string;
-    [key: string]: any; // for additional custom metadata
-  };
+
 }
 
 const PanoramaImageSchema: Schema = new Schema(
   {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-      index: true, // Indexed for search performance
-    },
     filename: {
       type: String,
       required: true,
       unique: true,
-    },
-    originalFilename: {
-      type: String,
-      required: true,
     },
     filePath: {
       type: String,
@@ -52,24 +35,23 @@ const PanoramaImageSchema: Schema = new Schema(
       required: true,
       enum: ["image/jpeg", "image/png", "image/jpg", "image/webp"],
     },
-    width: {
-      type: Number,
-      min: 0,
-    },
-    height: {
-      type: Number,
-      min: 0,
-    },
     isBookmarked: {
       type: Boolean,
       default: false,
       index: true, // Indexed for filtering by bookmark status
     },
-    metadata: {
-      camera: String,
-      location: String,
-      tags: [String],
-      description: String,
+
+    // For search and filter
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true, // Indexed for search performance
+    },
+    tags: [{ type: Schema.Types.ObjectId, ref: "Tag" }],
+    description: {
+      type: String,
+      trim: true,
     },
   },
   {

@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import * as dayjsModule from "dayjs";
 const dayjs = dayjsModule as any;
 import PanoramaImage from "../models/PanoramaImage";
+import Tag from "../models/Tag";
 import { CreatePanoramaImageRequest } from "../dtos/CreatePanoramaImageRequest";
 import { PanoramaImageItemDto } from "../dtos/PanoramaImageListResponse";
 import {
@@ -14,37 +15,36 @@ import logger from "../logger";
 const router = Router();
 
 /**
- * POST /api/panorama
- * Create a new PanoramaImage record after successful S3 upload
- *
- * Request body:
- * {
- *   key: string (required) - S3 object key/path
- *   name: string (required) - Display name for the image
- *   originalFilename: string (required) - Original filename from client
- *   fileSize: number (required) - File size in bytes
- *   mimeType: string (required) - MIME type (image/jpeg, image/png, image/jpg, image/webp)
- *   width?: number (optional) - Image width in pixels
- *   height?: number (optional) - Image height in pixels
- *   metadata?: object (optional) - Optional metadata
- * }
- *
- * Response:
- * {
- *   _id: string - MongoDB document ID
- *   name: string
- *   filename: string
- *   originalFilename: string
- *   filePath: string
- *   fileSize: number
- *   mimeType: string
- *   width?: number
- *   height?: number
- *   isBookmarked: boolean
- *   createdAt: Date
- *   updatedAt: Date
- *   metadata?: object
- * }
+ * @swagger
+ * /api/panorama:
+ *   post:
+ *     summary: Create a new PanoramaImage record after successful S3 upload
+ *     tags: [Panorama]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreatePanoramaImageRequest'
+ *     responses:
+ *       201:
+ *         description: PanoramaImage created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PanoramaImageItem'
+ *       400:
+ *         description: Bad request - validation error or duplicate filename
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 router.post("/", async (req: Request, res: Response) => {
   try {
@@ -52,12 +52,10 @@ router.post("/", async (req: Request, res: Response) => {
     const {
       key,
       name,
-      originalFilename,
       fileSize,
       mimeType,
-      width,
-      height,
-      metadata,
+      description,
+      tags,
     } = body;
 
     // Validate required fields
@@ -72,13 +70,6 @@ router.post("/", async (req: Request, res: Response) => {
       return res.status(400).json({
         error:
           "Missing or invalid 'name' field. 'name' must be a non-empty string.",
-      });
-    }
-
-    if (!originalFilename || typeof originalFilename !== "string") {
-      return res.status(400).json({
-        error:
-          "Missing or invalid 'originalFilename' field. 'originalFilename' must be a non-empty string.",
       });
     }
 
@@ -114,36 +105,66 @@ router.post("/", async (req: Request, res: Response) => {
     // Extract filename from S3 key (last segment after last '/')
     const filename = key.split("/").pop() || key;
 
-    // Validate optional fields
-    if (width !== undefined && (typeof width !== "number" || width < 0)) {
-      return res.status(400).json({
-        error: "Invalid 'width' field. 'width' must be a non-negative number.",
-      });
-    }
+    // Process tags: find existing or create new ones
+    const tagObjectIds: any[] = [];
+    if (tags && Array.isArray(tags) && tags.length > 0) {
+      // Deduplicate tag names (case-sensitive for creation, but we'll search case-insensitively)
+      const uniqueTagNames = Array.from(
+        new Set(tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0))
+      );
 
-    if (height !== undefined && (typeof height !== "number" || height < 0)) {
-      return res.status(400).json({
-        error:
-          "Invalid 'height' field. 'height' must be a non-negative number.",
-      });
+      for (const tagName of uniqueTagNames) {
+        try {
+          // Search for existing tag (case-insensitive)
+          const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          let existingTag = await Tag.findOne({
+            name: { $regex: new RegExp(`^${escapedTagName}$`, "i") },
+          });
+
+          if (!existingTag) {
+            // Create new tag with exact casing as provided
+            existingTag = new Tag({ name: tagName });
+            await existingTag.save();
+            logger.info(`Created new tag: ${tagName}`);
+          }
+
+          tagObjectIds.push(existingTag._id);
+        } catch (tagError: any) {
+          // Handle unique constraint error (race condition - tag was created by another request)
+          if (tagError.code === 11000 || tagError.name === "MongoServerError") {
+            // Tag already exists, find it again
+            const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const foundTag = await Tag.findOne({
+              name: { $regex: new RegExp(`^${escapedTagName}$`, "i") },
+            });
+            if (foundTag) {
+              tagObjectIds.push(foundTag._id);
+            }
+          } else {
+            logger.error(`Error processing tag "${tagName}": ${tagError}`);
+            // Continue with other tags even if one fails
+          }
+        }
+      }
     }
 
     // Create new PanoramaImage document
     const panoramaImage = new PanoramaImage({
       name: name.trim(),
       filename,
-      originalFilename,
       filePath: key,
       fileSize,
       mimeType,
-      width,
-      height,
       isBookmarked: false,
-      metadata,
+      description: description?.trim(),
+      tags: tagObjectIds,
     });
 
     // Save to database
     const savedImage = await panoramaImage.save();
+
+    // Populate tags before converting to DTO
+    await savedImage.populate("tags");
 
     // Convert to DTO
     const responseDto = new PanoramaImageItemDto(savedImage);
@@ -181,33 +202,50 @@ router.post("/", async (req: Request, res: Response) => {
 });
 
 /**
- * PATCH /api/panorama/:id/bookmark
- * Update the bookmark status of a PanoramaImage
- *
- * URL Parameters:
- * - id: string (required) - MongoDB document ID
- *
- * Request body:
- * {
- *   isBookmarked: boolean (required) - Bookmark status (true to bookmark, false to unbookmark)
- * }
- *
- * Response:
- * {
- *   _id: string - MongoDB document ID
- *   name: string
- *   filename: string
- *   originalFilename: string
- *   filePath: string
- *   fileSize: number
- *   mimeType: string
- *   width?: number
- *   height?: number
- *   isBookmarked: boolean
- *   createdAt: Date
- *   updatedAt: Date
- *   metadata?: object
- * }
+ * @swagger
+ * /api/panorama/{id}/bookmark:
+ *   patch:
+ *     summary: Update the bookmark status of a PanoramaImage
+ *     tags: [Panorama]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB document ID
+ *         example: "507f1f77bcf86cd799439011"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/BookmarkUpdateRequest'
+ *     responses:
+ *       200:
+ *         description: Bookmark status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PanoramaImageItem'
+ *       400:
+ *         description: Bad request - invalid ID format or missing isBookmarked field
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: PanoramaImage not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 router.patch("/:id/bookmark", async (req: Request, res: Response) => {
   try {
@@ -278,35 +316,53 @@ router.patch("/:id/bookmark", async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/panorama/analytics
- * Get analytics data about bookmarked/un-bookmarked images over time
- *
- * Query parameters:
- * - startDate (optional): ISO date string - Start date for filtering
- * - endDate (optional): ISO date string - End date for filtering
- * - period (optional): "day" | "week" | "month" - Aggregation period (default: "day")
- *
- * Response:
- * {
- *   summary: {
- *     totalImages: number,
- *     bookmarkedCount: number,
- *     unbookmarkedCount: number,
- *     bookmarkedPercentage: number,
- *     unbookmarkedPercentage: number
- *   },
- *   timeSeries: [
- *     {
- *       date: string,
- *       bookmarked: number,
- *       unbookmarked: number,
- *       total: number
- *     }
- *   ],
- *   period: string,
- *   startDate?: Date,
- *   endDate?: Date
- * }
+ * @swagger
+ * /api/panorama/analytics:
+ *   get:
+ *     summary: Get analytics data about bookmarked/un-bookmarked images over time
+ *     tags: [Panorama]
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Start date for filtering (ISO date string)
+ *         example: "2024-01-01T00:00:00Z"
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: End date for filtering (ISO date string)
+ *         example: "2024-12-31T23:59:59Z"
+ *       - in: query
+ *         name: period
+ *         schema:
+ *           type: string
+ *           enum: [day, week, month]
+ *           default: day
+ *         description: Aggregation period
+ *         example: "day"
+ *     responses:
+ *       200:
+ *         description: Analytics data retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/BookmarkAnalyticsResponse'
+ *       400:
+ *         description: Bad request - invalid date format or period
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 router.get("/analytics", async (req: Request, res: Response) => {
   try {

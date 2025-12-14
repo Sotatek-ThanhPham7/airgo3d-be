@@ -65,35 +65,23 @@ function generateMockImage(index: number): any {
   const filename = `panorama-${index}-${uuidv4()}.${mimeType.split("/")[1]}`;
   const filePath = `images/${filename}`;
 
-  // Build metadata object conditionally
-  const metadata: any = {};
-  if (camera) {
-    metadata.camera = camera;
-  }
-  if (location) {
-    metadata.location = location;
-  }
-  if (tagSet.length > 0) {
-    metadata.tags = tagSet;
-  }
-  if (Math.random() > 0.7) {
-    metadata.description = `A beautiful panoramic view captured on ${uploadedAt.toLocaleDateString()}`;
-  }
+  // Generate description conditionally
+  const description =
+    Math.random() > 0.7
+      ? `A beautiful panoramic view captured on ${uploadedAt.toLocaleDateString()}`
+      : undefined;
 
   return {
     name: `Panorama Image ${index + 1}`,
     filename,
-    originalFilename: `original-panorama-${index + 1}.${
-      mimeType.split("/")[1]
-    }`,
     filePath,
     fileSize: Math.floor(Math.random() * 5000000) + 500000, // 500KB to 5MB
     mimeType,
-    width: Math.floor(Math.random() * 2000) + 1920, // 1920 to 3920
-    height: Math.floor(Math.random() * 1000) + 1080, // 1080 to 2080
     isBookmarked,
+    description,
     createdAt: uploadedAt,
-    metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+    // Note: tags would need to be processed separately to create Tag documents
+    // For now, we'll leave tags empty in seed data
   };
 }
 

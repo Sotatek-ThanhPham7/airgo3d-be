@@ -6,22 +6,36 @@ import logger from "../logger";
 const router = Router();
 
 /**
- * POST /api/s3/presigned-url
- * Generate a presigned URL for uploading a file to S3
- *
- * Request body:
- * {
- *   contentType?: string (optional) - Content type of the file
- *   expiresIn?: number (optional) - Expiration time in seconds (default: 5 minutes)
- *   prefix?: string (optional) - Optional prefix/path for the S3 key (e.g., "uploads/images/")
- * }
- *
- * Response:
- * {
- *   url: string - The presigned URL
- *   key: string - The auto-generated S3 object key (UUID v4)
- *   expiresIn: number - Expiration time in seconds
- * }
+ * @swagger
+ * /api/s3/presigned-url:
+ *   post:
+ *     summary: Generate a presigned URL for uploading a file to S3
+ *     tags: [S3]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/PresignedUrlRequest'
+ *     responses:
+ *       200:
+ *         description: Presigned URL generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PresignedUrlResponse'
+ *       400:
+ *         description: Bad request - missing or invalid parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 router.post("/presigned-url", async (req: Request, res: Response) => {
   try {

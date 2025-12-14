@@ -1,17 +1,18 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface IPanoramaImage extends Document {
-  name: string;
   filename: string;
   filePath: string;
   fileSize: number; // in bytes
   mimeType: string;
   isBookmarked: boolean;
+
+  // For search and filter
+  name: string;
   description?: string;
-  tags?: mongoose.Types.ObjectId[] | Array<{ _id: mongoose.Types.ObjectId; name: string }>;
+  tags?: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
-
 }
 
 const PanoramaImageSchema: Schema = new Schema(

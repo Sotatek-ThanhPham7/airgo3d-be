@@ -280,6 +280,46 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        PaginationMeta: {
+          type: "object",
+          properties: {
+            page: {
+              type: "integer",
+              description: "Current page number",
+              example: 1,
+            },
+            limit: {
+              type: "integer",
+              description: "Number of items per page",
+              example: 10,
+            },
+            total: {
+              type: "integer",
+              description: "Total number of items",
+              example: 100,
+            },
+            totalPages: {
+              type: "integer",
+              description: "Total number of pages",
+              example: 10,
+            },
+          },
+        },
+        PanoramaImageListResponse: {
+          type: "object",
+          properties: {
+            data: {
+              type: "array",
+              items: {
+                $ref: "#/components/schemas/PanoramaImageItem",
+              },
+              description: "Array of PanoramaImage items",
+            },
+            pagination: {
+              $ref: "#/components/schemas/PaginationMeta",
+            },
+          },
+        },
       },
     },
   },

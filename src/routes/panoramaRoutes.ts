@@ -4,12 +4,20 @@ const dayjs = dayjsModule as any;
 import PanoramaImage from "../models/PanoramaImage";
 import Tag from "../models/Tag";
 import { CreatePanoramaImageRequest } from "../dtos/CreatePanoramaImageRequest";
-import { PanoramaImageItemDto } from "../dtos/PanoramaImageListResponse";
+import { BookmarkUpdateRequest } from "../dtos/BookmarkUpdateRequest";
+import { SearchPanoramaImageQuery } from "../dtos/SearchPanoramaImageQuery";
+import { AnalyticsQuery } from "../dtos/AnalyticsQuery";
+import { MongoIdParam } from "../dtos/MongoIdParam";
+import {
+  PanoramaImageItemDto,
+  PanoramaImageListResponse,
+} from "../dtos/PanoramaImageListResponse";
 import {
   BookmarkAnalyticsResponse,
   BookmarkAnalyticsSummary,
   TimeSeriesDataPoint,
 } from "../dtos/BookmarkAnalyticsResponse";
+import { validateRequest } from "../middleware/validation";
 import logger from "../logger";
 
 const router = Router();
@@ -46,64 +54,16 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post("/", async (req: Request, res: Response) => {
-  try {
-    const body: CreatePanoramaImageRequest = req.body;
-    const {
-      key,
-      name,
-      fileSize,
-      mimeType,
-      description,
-      tags,
-    } = body;
+router.post(
+  "/",
+  validateRequest(CreatePanoramaImageRequest, "body"),
+  async (req: Request, res: Response) => {
+    try {
+      const body = (req as any).validated as CreatePanoramaImageRequest;
+      const { key, name, fileSize, mimeType, description, tags } = body;
 
-    // Validate required fields
-    if (!key || typeof key !== "string") {
-      return res.status(400).json({
-        error:
-          "Missing or invalid 'key' field. 'key' must be a non-empty string.",
-      });
-    }
-
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
-      return res.status(400).json({
-        error:
-          "Missing or invalid 'name' field. 'name' must be a non-empty string.",
-      });
-    }
-
-    if (!fileSize || typeof fileSize !== "number" || fileSize < 0) {
-      return res.status(400).json({
-        error:
-          "Missing or invalid 'fileSize' field. 'fileSize' must be a non-negative number.",
-      });
-    }
-
-    if (!mimeType || typeof mimeType !== "string") {
-      return res.status(400).json({
-        error:
-          "Missing or invalid 'mimeType' field. 'mimeType' must be a string.",
-      });
-    }
-
-    // Validate mimeType enum
-    const validMimeTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/jpg",
-      "image/webp",
-    ];
-    if (!validMimeTypes.includes(mimeType)) {
-      return res.status(400).json({
-        error: `Invalid 'mimeType'. Must be one of: ${validMimeTypes.join(
-          ", "
-        )}`,
-      });
-    }
-
-    // Extract filename from S3 key (last segment after last '/')
-    const filename = key.split("/").pop() || key;
+      // Extract filename from S3 key (last segment after last '/')
+      const filename = key.split("/").pop() || key;
 
     // Process tags: find existing or create new ones
     const tagObjectIds: any[] = [];
@@ -133,7 +93,10 @@ router.post("/", async (req: Request, res: Response) => {
           // Handle unique constraint error (race condition - tag was created by another request)
           if (tagError.code === 11000 || tagError.name === "MongoServerError") {
             // Tag already exists, find it again
-            const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const escapedTagName = tagName.replace(
+              /[.*+?^${}()|[\]\\]/g,
+              "\\$&"
+            );
             const foundTag = await Tag.findOne({
               name: { $regex: new RegExp(`^${escapedTagName}$`, "i") },
             });
@@ -203,6 +166,167 @@ router.post("/", async (req: Request, res: Response) => {
 
 /**
  * @swagger
+ * /api/panorama:
+ *   get:
+ *     summary: Search and filter PanoramaImage records with pagination
+ *     tags: [Panorama]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for pagination
+ *         example: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of items per page
+ *         example: 10
+ *       - in: query
+ *         name: isBookmarked
+ *         schema:
+ *           type: boolean
+ *         description: Filter by bookmark status
+ *         example: true
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search term for name and description (case-insensitive)
+ *         example: "beautiful"
+ *       - in: query
+ *         name: tags
+ *         schema:
+ *           type: array
+ *           items:
+ *             type: string
+ *         description: Array of tag names to filter by (can be comma-separated or array)
+ *         style: form
+ *         explode: true
+ *         example: ["nature", "landscape"]
+ *     responses:
+ *       200:
+ *         description: PanoramaImage records retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PanoramaImageListResponse'
+ *       400:
+ *         description: Bad request - invalid query parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get(
+  "",
+  validateRequest(SearchPanoramaImageQuery, "query"),
+  async (req: Request, res: Response) => {
+    try {
+      const queryParams = (req as any).validated as SearchPanoramaImageQuery;
+      const {
+        page = 1,
+        limit = 10,
+        isBookmarked,
+        search,
+        tags,
+      } = queryParams;
+
+      // Build query
+      const query: any = {};
+
+      // Filter by bookmark status
+      if (isBookmarked !== undefined) {
+        query.isBookmarked = isBookmarked;
+      }
+
+    // Text search on name and description
+    if (search && search.trim().length > 0) {
+      const escapedSearchTerm = search
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(escapedSearchTerm, "i");
+      query.$or = [
+        { name: { $regex: searchRegex } },
+        { description: { $regex: searchRegex } },
+      ];
+    }
+
+    // Filter by tags
+    if (tags && tags.length > 0) {
+      const tagNames = tags;
+      // Find Tag documents matching the tag names (case-insensitive)
+      const tagQueries = tagNames.map((tagName) => {
+        const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return { name: { $regex: new RegExp(`^${escapedTagName}$`, "i") } };
+      });
+
+      const matchingTags = await Tag.find({
+        $or: tagQueries,
+      }).select("_id");
+
+      if (matchingTags.length > 0) {
+        const tagObjectIds = matchingTags.map((tag) => tag._id);
+        query.tags = { $in: tagObjectIds };
+      } else {
+        // No matching tags found, return empty result
+        query.tags = { $in: [] };
+      }
+    }
+
+    // Calculate skip value for pagination
+    const skip = (page - 1) * limit;
+
+    // Execute query with pagination and populate tags
+    const [panoramaImages, total] = await Promise.all([
+      PanoramaImage.find(query)
+        .populate("tags")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      PanoramaImage.countDocuments(query),
+    ]);
+
+    // Convert to DTOs
+    const data = panoramaImages.map((image) => new PanoramaImageItemDto(image));
+
+    // Create response
+    const response = new PanoramaImageListResponse(data, page, limit, total);
+
+    logger.info(
+      `PanoramaImage search completed: page=${page}, limit=${limit}, total=${total}, filters=${JSON.stringify(
+        query
+      )}`
+    );
+
+    res.status(200).json(response);
+  } catch (error: any) {
+    logger.error(`Error searching PanoramaImage: ${error}`);
+
+    // Generic server error
+    res.status(500).json({
+      error: "Failed to search PanoramaImage",
+      message: error.message || "Internal server error",
+    });
+  }
+  }
+);
+
+/**
+ * @swagger
  * /api/panorama/{id}/bookmark:
  *   patch:
  *     summary: Update the bookmark status of a PanoramaImage
@@ -247,73 +371,66 @@ router.post("/", async (req: Request, res: Response) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.patch("/:id/bookmark", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { isBookmarked } = req.body;
+router.patch(
+  "/:id/bookmark",
+  validateRequest(MongoIdParam, "params"),
+  validateRequest(BookmarkUpdateRequest, "body"),
+  async (req: Request, res: Response) => {
+    try {
+      const validated = (req as any).validated as any;
+      const params = validated.params as MongoIdParam;
+      const body = validated.body as BookmarkUpdateRequest;
+      const { id } = params;
+      const { isBookmarked } = body;
 
-    // Validate ID
-    if (!id) {
-      return res.status(400).json({
-        error: "Missing 'id' parameter in URL.",
+      // Find and update the PanoramaImage
+      const panoramaImage = await PanoramaImage.findByIdAndUpdate(
+        id,
+        { isBookmarked },
+        { new: true, runValidators: true }
+      );
+
+      // Check if image was found
+      if (!panoramaImage) {
+        return res.status(404).json({
+          error: "PanoramaImage not found.",
+        });
+      }
+
+      // Convert to DTO
+      const responseDto = new PanoramaImageItemDto(panoramaImage);
+
+      logger.info(
+        `Updated bookmark status for PanoramaImage ID: ${id}, isBookmarked: ${isBookmarked}`
+      );
+
+      res.status(200).json(responseDto);
+    } catch (error: any) {
+      logger.error(`Error updating bookmark status: ${error}`);
+
+      // Handle invalid ObjectId format
+      if (error.name === "CastError" || error.kind === "ObjectId") {
+        return res.status(400).json({
+          error: "Invalid PanoramaImage ID format.",
+        });
+      }
+
+      // Handle validation errors
+      if (error.name === "ValidationError") {
+        return res.status(400).json({
+          error: "Validation error",
+          message: error.message,
+        });
+      }
+
+      // Generic server error
+      res.status(500).json({
+        error: "Failed to update bookmark status",
+        message: error.message || "Internal server error",
       });
     }
-
-    // Validate isBookmarked field
-    if (typeof isBookmarked !== "boolean") {
-      return res.status(400).json({
-        error:
-          "Missing or invalid 'isBookmarked' field. 'isBookmarked' must be a boolean.",
-      });
-    }
-
-    // Find and update the PanoramaImage
-    const panoramaImage = await PanoramaImage.findByIdAndUpdate(
-      id,
-      { isBookmarked },
-      { new: true, runValidators: true }
-    );
-
-    // Check if image was found
-    if (!panoramaImage) {
-      return res.status(404).json({
-        error: "PanoramaImage not found.",
-      });
-    }
-
-    // Convert to DTO
-    const responseDto = new PanoramaImageItemDto(panoramaImage);
-
-    logger.info(
-      `Updated bookmark status for PanoramaImage ID: ${id}, isBookmarked: ${isBookmarked}`
-    );
-
-    res.status(200).json(responseDto);
-  } catch (error: any) {
-    logger.error(`Error updating bookmark status: ${error}`);
-
-    // Handle invalid ObjectId format
-    if (error.name === "CastError" || error.kind === "ObjectId") {
-      return res.status(400).json({
-        error: "Invalid PanoramaImage ID format.",
-      });
-    }
-
-    // Handle validation errors
-    if (error.name === "ValidationError") {
-      return res.status(400).json({
-        error: "Validation error",
-        message: error.message,
-      });
-    }
-
-    // Generic server error
-    res.status(500).json({
-      error: "Failed to update bookmark status",
-      message: error.message || "Internal server error",
-    });
   }
-});
+);
 
 /**
  * @swagger
@@ -364,188 +481,187 @@ router.patch("/:id/bookmark", async (req: Request, res: Response) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get("/analytics", async (req: Request, res: Response) => {
-  try {
-    const { startDate, endDate, period = "day" } = req.query;
+router.get(
+  "/analytics",
+  validateRequest(AnalyticsQuery, "query"),
+  async (req: Request, res: Response) => {
+    try {
+      const queryParams = (req as any).validated as AnalyticsQuery;
+      const { startDate, endDate, period = "day" } = queryParams;
 
-    // Validate period parameter
-    const validPeriods = ["day", "week", "month"];
-    if (period && !validPeriods.includes(period as string)) {
-      return res.status(400).json({
-        error: `Invalid 'period' parameter. Must be one of: ${validPeriods.join(
-          ", "
-        )}`,
-      });
-    }
+      // Parse and validate dates using dayjs
+      let startDateObj: Date | undefined;
+      let endDateObj: Date | undefined;
 
-    // Parse and validate dates using dayjs
-    let startDateObj: Date | undefined;
-    let endDateObj: Date | undefined;
+      if (startDate) {
+        const parsedStartDate = dayjs(startDate);
+        if (!parsedStartDate.isValid()) {
+          return res.status(400).json({
+            error: "Invalid 'startDate' format. Must be a valid ISO date string.",
+          });
+        }
+        startDateObj = parsedStartDate.startOf("day").toDate();
+      }
 
-    if (startDate) {
-      const parsedStartDate = dayjs(startDate as string);
-      if (!parsedStartDate.isValid()) {
+      if (endDate) {
+        const parsedEndDate = dayjs(endDate);
+        if (!parsedEndDate.isValid()) {
+          return res.status(400).json({
+            error: "Invalid 'endDate' format. Must be a valid ISO date string.",
+          });
+        }
+        endDateObj = parsedEndDate.endOf("day").toDate();
+      }
+
+      // Validate date range
+      if (
+        startDateObj &&
+        endDateObj &&
+        dayjs(startDateObj).isAfter(endDateObj)
+      ) {
         return res.status(400).json({
-          error: "Invalid 'startDate' format. Must be a valid ISO date string.",
+          error: "'startDate' must be before or equal to 'endDate'.",
         });
       }
-      startDateObj = parsedStartDate.startOf("day").toDate();
-    }
 
-    if (endDate) {
-      const parsedEndDate = dayjs(endDate as string);
-      if (!parsedEndDate.isValid()) {
-        return res.status(400).json({
-          error: "Invalid 'endDate' format. Must be a valid ISO date string.",
-        });
+      // Build date format string based on period
+      let dateFormatString: string;
+      switch (period) {
+        case "week":
+          dateFormatString = "%Y-W%V"; // ISO week format: YYYY-Www
+          break;
+        case "month":
+          dateFormatString = "%Y-%m"; // YYYY-MM
+          break;
+        case "day":
+        default:
+          dateFormatString = "%Y-%m-%d"; // YYYY-MM-DD
+          break;
       }
-      endDateObj = parsedEndDate.endOf("day").toDate();
-    }
 
-    // Validate date range
-    if (startDateObj && endDateObj && dayjs(startDateObj).isAfter(endDateObj)) {
-      return res.status(400).json({
-        error: "'startDate' must be before or equal to 'endDate'.",
+      // Build aggregation pipeline
+      const pipeline: any[] = [];
+
+      // Match stage: filter by date range if provided
+      const matchStage: any = {};
+      if (startDateObj || endDateObj) {
+        matchStage.createdAt = {};
+        if (startDateObj) {
+          matchStage.createdAt.$gte = startDateObj;
+        }
+        if (endDateObj) {
+          matchStage.createdAt.$lte = endDateObj;
+        }
+        pipeline.push({ $match: matchStage });
+      }
+
+      // Group stage: group by date period and bookmark status
+      pipeline.push({
+        $group: {
+          _id: {
+            date: {
+              $dateToString: {
+                format: dateFormatString,
+                date: "$createdAt",
+              },
+            },
+            isBookmarked: "$isBookmarked",
+          },
+          count: { $sum: 1 },
+        },
+      });
+
+      pipeline.push({
+        $group: {
+          _id: "$_id.date",
+          bookmarked: {
+            $sum: {
+              $cond: {
+                if: { $eq: ["$_id.isBookmarked", true] },
+                then: "$count",
+                else: 0,
+              },
+            },
+          },
+          unbookmarked: {
+            $sum: {
+              $cond: {
+                if: { $eq: ["$_id.isBookmarked", false] },
+                then: "$count",
+                else: 0,
+              },
+            },
+          },
+          total: { $sum: "$count" },
+        },
+      });
+
+      pipeline.push({
+        $project: {
+          date: "$_id",
+          _id: 0,
+          bookmarked: 1,
+          unbookmarked: 1,
+          total: 1,
+        },
+      });
+
+      // Sort by date
+      pipeline.push({
+        $sort: { date: 1 },
+      });
+
+      // Execute aggregation
+      const aggregationResult = await PanoramaImage.aggregate(pipeline);
+
+      let totalImages = 0;
+      let bookmarkedCount = 0;
+      let unbookmarkedCount = 0;
+      let bookmarkedPercentage = 0;
+      let unbookmarkedPercentage = 0;
+      aggregationResult.forEach((item) => {
+        totalImages += item.total;
+        bookmarkedCount += item.bookmarked;
+        unbookmarkedCount += item.unbookmarked;
+        bookmarkedPercentage =
+          Math.round((bookmarkedCount / totalImages) * 100 * 100) / 100;
+        unbookmarkedPercentage =
+          Math.round((unbookmarkedCount / totalImages) * 100 * 100) / 100;
+      });
+
+      const summary: BookmarkAnalyticsSummary = {
+        totalImages,
+        bookmarkedCount,
+        unbookmarkedCount,
+        bookmarkedPercentage,
+        unbookmarkedPercentage,
+      };
+
+      const response = new BookmarkAnalyticsResponse(
+        summary,
+        aggregationResult as unknown as TimeSeriesDataPoint[],
+        period as string,
+        startDateObj,
+        endDateObj
+      );
+
+      logger.info(
+        `Retrieved bookmark analytics: period=${period}, total=${totalImages}, dateRange=${
+          startDateObj ? startDateObj.toISOString() : "none"
+        }-${endDateObj ? endDateObj.toISOString() : "none"}`
+      );
+
+      res.status(200).json(response);
+    } catch (error: any) {
+      logger.error(`Error retrieving bookmark analytics: ${error}`);
+
+      // Generic server error
+      res.status(500).json({
+        error: "Failed to retrieve bookmark analytics",
+        message: error.message || "Internal server error",
       });
     }
-
-    // Build date format string based on period
-    let dateFormatString: string;
-    switch (period) {
-      case "week":
-        dateFormatString = "%Y-W%V"; // ISO week format: YYYY-Www
-        break;
-      case "month":
-        dateFormatString = "%Y-%m"; // YYYY-MM
-        break;
-      case "day":
-      default:
-        dateFormatString = "%Y-%m-%d"; // YYYY-MM-DD
-        break;
-    }
-
-    // Build aggregation pipeline
-    const pipeline: any[] = [];
-
-    // Match stage: filter by date range if provided
-    const matchStage: any = {};
-    if (startDateObj || endDateObj) {
-      matchStage.createdAt = {};
-      if (startDateObj) {
-        matchStage.createdAt.$gte = startDateObj;
-      }
-      if (endDateObj) {
-        matchStage.createdAt.$lte = endDateObj;
-      }
-      pipeline.push({ $match: matchStage });
-    }
-
-    // Group stage: group by date period and bookmark status
-    pipeline.push({
-      $group: {
-        _id: {
-          date: {
-            $dateToString: {
-              format: dateFormatString,
-              date: "$createdAt",
-            },
-          },
-          isBookmarked: "$isBookmarked",
-        },
-        count: { $sum: 1 },
-      },
-    });
-
-    pipeline.push({
-      $group: {
-        _id: "$_id.date",
-        bookmarked: {
-          $sum: {
-            $cond: {
-              if: { $eq: ["$_id.isBookmarked", true] },
-              then: "$count",
-              else: 0,
-            },
-          },
-        },
-        unbookmarked: {
-          $sum: {
-            $cond: {
-              if: { $eq: ["$_id.isBookmarked", false] },
-              then: "$count",
-              else: 0,
-            },
-          },
-        },
-        total: { $sum: "$count" },
-      },
-    });
-
-    pipeline.push({
-      $project: {
-        date: "$_id",
-        _id: 0,
-        bookmarked: 1,
-        unbookmarked: 1,
-        total: 1,
-      },
-    });
-
-    // Sort by date
-    pipeline.push({
-      $sort: { date: 1 },
-    });
-
-    // Execute aggregation
-    const aggregationResult = await PanoramaImage.aggregate(pipeline);
-
-    let totalImages = 0;
-    let bookmarkedCount = 0;
-    let unbookmarkedCount = 0;
-    let bookmarkedPercentage = 0;
-    let unbookmarkedPercentage = 0;
-    aggregationResult.forEach((item) => {
-      totalImages += item.total;
-      bookmarkedCount += item.bookmarked;
-      unbookmarkedCount += item.unbookmarked;
-      bookmarkedPercentage =
-        Math.round((bookmarkedCount / totalImages) * 100 * 100) / 100;
-      unbookmarkedPercentage =
-        Math.round((unbookmarkedCount / totalImages) * 100 * 100) / 100;
-    });
-
-    const summary: BookmarkAnalyticsSummary = {
-      totalImages,
-      bookmarkedCount,
-      unbookmarkedCount,
-      bookmarkedPercentage,
-      unbookmarkedPercentage,
-    };
-
-    const response = new BookmarkAnalyticsResponse(
-      summary,
-      aggregationResult as unknown as TimeSeriesDataPoint[],
-      period as string,
-      startDateObj,
-      endDateObj
-    );
-
-    logger.info(
-      `Retrieved bookmark analytics: period=${period}, total=${totalImages}, dateRange=${
-        startDateObj ? startDateObj.toISOString() : "none"
-      }-${endDateObj ? endDateObj.toISOString() : "none"}`
-    );
-
-    res.status(200).json(response);
-  } catch (error: any) {
-    logger.error(`Error retrieving bookmark analytics: ${error}`);
-
-    // Generic server error
-    res.status(500).json({
-      error: "Failed to retrieve bookmark analytics",
-      message: error.message || "Internal server error",
-    });
   }
-});
+);
 
 export default router;

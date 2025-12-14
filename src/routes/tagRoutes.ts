@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import Tag from "../models/Tag";
+import { TagSearchQuery } from "../dtos/TagSearchQuery";
+import { validateRequest } from "../middleware/validation";
 import logger from "../logger";
 
 const router = Router();
@@ -40,19 +42,16 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get("/search", async (req: Request, res: Response) => {
-  try {
-    const { q } = req.query;
+router.get(
+  "/search",
+  validateRequest(TagSearchQuery, "query"),
+  async (req: Request, res: Response) => {
+    try {
+      const queryParams = (req as any).validated as TagSearchQuery;
+      const { q } = queryParams;
 
-    // Validate search query
-    if (!q || typeof q !== "string" || q.trim().length === 0) {
-      return res.status(400).json({
-        error: "Missing or invalid 'q' query parameter. 'q' must be a non-empty string.",
-      });
-    }
-
-    // Escape special regex characters in search term
-    const escapedSearchTerm = q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Escape special regex characters in search term
+      const escapedSearchTerm = q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     // Search for tags (case-insensitive, limit to 20 results)
     const tags = await Tag.find({
@@ -73,6 +72,7 @@ router.get("/search", async (req: Request, res: Response) => {
       message: error.message || "Internal server error",
     });
   }
-});
+  }
+);
 
 export default router;

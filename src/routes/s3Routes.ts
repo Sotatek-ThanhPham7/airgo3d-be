@@ -1,6 +1,8 @@
 import { Router, Request, Response } from "express";
 import uuid = require("uuid");
 import s3Service from "../services/s3Service";
+import { PresignedUrlRequest } from "../dtos/PresignedUrlRequest";
+import { validateRequest } from "../middleware/validation";
 import logger from "../logger";
 
 const router = Router();
@@ -37,21 +39,13 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.post("/presigned-url", async (req: Request, res: Response) => {
-  try {
-    const { contentType, prefix = "images", fileName } = req.body;
-
-    if (!fileName) {
-      return res.status(400).json({
-        error: "File name is required",
-      });
-    }
-
-    if (!contentType) {
-      return res.status(400).json({
-        error: "Content type is required",
-      });
-    }
+router.post(
+  "/presigned-url",
+  validateRequest(PresignedUrlRequest, "body"),
+  async (req: Request, res: Response) => {
+    try {
+      const body = (req as any).validated as PresignedUrlRequest;
+      const { contentType, prefix = "images", fileName } = body;
 
     const generatedUuid = uuid.v4();
     const key = `${prefix}/${fileName}-${generatedUuid}`;
@@ -80,6 +74,7 @@ router.post("/presigned-url", async (req: Request, res: Response) => {
       message: error.message || "Internal server error",
     });
   }
-});
+  }
+);
 
 export default router;

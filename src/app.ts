@@ -1,6 +1,7 @@
 import * as cors from "cors";
 import * as express from "express";
 import * as morgan from "morgan";
+// eslint-disable-next-line @typescript-eslint/no-var-requires, node/no-unsupported-features/es-syntax
 const swaggerUi = require("swagger-ui-express");
 import swaggerSpec from "./config/swagger";
 import logger from "./logger";

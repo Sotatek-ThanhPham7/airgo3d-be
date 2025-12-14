@@ -8,7 +8,9 @@
     "sourceMap": true,
     "outDir": "build",
     "baseUrl": "./src/",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "include": ["src/**/*", "scripts/**/*"],
   "exclude": [

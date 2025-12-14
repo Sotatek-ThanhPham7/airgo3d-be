@@ -48,7 +48,7 @@ router.post(
       const { contentType, prefix = "images", fileName } = body;
 
     const generatedUuid = uuid.v4();
-    const key = `${prefix}/${fileName}-${generatedUuid}`;
+    const key = `${prefix}/${generatedUuid}-${fileName}`;
 
     const expiresIn = parseInt(
       process.env.S3_PRESIGNED_URL_EXPIRY_SECONDS || "300",

@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 import * as cors from "cors";
 import * as express from "express";
 import * as morgan from "morgan";
-// eslint-disable-next-line @typescript-eslint/no-var-requires, node/no-unsupported-features/es-syntax
 const swaggerUi = require("swagger-ui-express");
 import swaggerSpec from "./config/swagger";
 import logger from "./logger";
@@ -15,11 +15,14 @@ app.use(morgan("tiny"));
 app.use(express.json({ limit: "500mb" }));
 app.use(express.urlencoded({ limit: "500mb", extended: true }));
 
-// Swagger documentation
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: ".swagger-ui .topbar { display: none }",
-  customSiteTitle: "AirGo3D API Documentation",
-}));
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customCss: ".swagger-ui .topbar { display: none }",
+    customSiteTitle: "AirGo3D API Documentation",
+  })
+);
 
 /**
  * @swagger
@@ -40,15 +43,12 @@ app.get("/", (req, res) => {
   res.status(200).send("Hello");
 });
 
-// S3 routes
 app.use("/api/s3", s3Routes);
 
-// Panorama routes
 app.use("/api/panorama", panoramaRoutes);
 
-// Tag routes
 app.use("/api/tags", tagRoutes);
-// error handler
+
 app.use((err: any, req: any, res: any, next: any) => {
   if (err) {
     logger.error(err);

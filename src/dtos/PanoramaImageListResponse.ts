@@ -30,17 +30,17 @@ export class PanoramaImageItemDto {
 
     // Handle tags - can be populated (objects) or ObjectIds
     if (panoramaImage.tags && Array.isArray(panoramaImage.tags)) {
-      this.tags = panoramaImage.tags.map((tag: any) => {
-        if (typeof tag === "object" && tag._id && tag.name) {
-          // Tag is populated
-          return {
-            _id: tag._id.toString(),
-            name: tag.name,
-          };
-        }
-        // Tag is just an ObjectId, return empty (shouldn't happen if populated correctly)
-        return null;
-      }).filter((tag: any) => tag !== null);
+      this.tags = panoramaImage.tags
+        .map((tag: any) => {
+          if (typeof tag === "object" && tag._id && tag.name) {
+            return {
+              _id: tag._id.toString(),
+              name: tag.name,
+            };
+          }
+          return null;
+        })
+        .filter((tag: any) => tag !== null);
     }
   }
 }

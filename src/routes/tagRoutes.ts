@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import Tag from "../models/Tag";
 import { TagSearchQuery } from "../dtos/TagSearchQuery";
+import { TagListResponse, TagItemDto } from "../dtos/TagListResponse";
 import { validateRequest } from "../middleware/validation";
 import logger from "../logger";
 
@@ -8,29 +9,44 @@ const router = Router();
 
 /**
  * @swagger
- * /api/tags/search:
+ * /api/tags/suggest:
  *   get:
- *     summary: Search for tags by name (case-insensitive)
+ *     summary: Suggest tags by name (case-insensitive) with pagination
  *     tags: [Tags]
  *     parameters:
  *       - in: query
  *         name: q
- *         required: true
+ *         required: false
  *         schema:
  *           type: string
- *         description: Search term for tag name
+ *         description: Search term for tag name (optional)
  *         example: "nature"
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of results per page
  *     responses:
  *       200:
  *         description: Tags found successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Tag'
+ *               $ref: '#/components/schemas/TagListResponse'
  *       400:
- *         description: Bad request - missing or invalid query parameter
+ *         description: Bad request - invalid query parameters
  *         content:
  *           application/json:
  *             schema:
@@ -43,35 +59,54 @@ const router = Router();
  *               $ref: '#/components/schemas/Error'
  */
 router.get(
-  "/search",
+  "/suggest",
   validateRequest(TagSearchQuery, "query"),
   async (req: Request, res: Response) => {
     try {
       const queryParams = (req as any).validated as TagSearchQuery;
-      const { q } = queryParams;
+      const { page = 1, limit = 10, q } = queryParams;
 
-      // Escape special regex characters in search term
-      const escapedSearchTerm = q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const query: any = {};
 
-    // Search for tags (case-insensitive, limit to 20 results)
-    const tags = await Tag.find({
-      name: { $regex: escapedSearchTerm, $options: "i" },
-    })
-      .limit(20)
-      .select("_id name")
-      .lean();
+      if (q && q.trim().length > 0) {
+        const escapedSearchTerm = q
+          .trim()
+          .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const searchRegex = new RegExp(escapedSearchTerm, "i");
+        query.name = { $regex: searchRegex };
+      }
 
-    logger.info(`Tag search completed: query="${q}", found ${tags.length} results`);
+      const skip = (page - 1) * limit;
 
-    res.status(200).json(tags);
-  } catch (error: any) {
-    logger.error(`Error searching tags: ${error}`);
+      const [tags, total] = await Promise.all([
+        Tag.find(query)
+          .sort({ name: 1 })
+          .skip(skip)
+          .limit(limit)
+          .select("_id name")
+          .lean(),
+        Tag.countDocuments(query),
+      ]);
 
-    res.status(500).json({
-      error: "Failed to search tags",
-      message: error.message || "Internal server error",
-    });
-  }
+      const data = tags.map((tag) => new TagItemDto(tag));
+
+      const response = new TagListResponse(data, page, limit, total);
+
+      logger.info(
+        `Tag suggest completed: page=${page}, limit=${limit}, total=${total}, query="${
+          q || ""
+        }"`
+      );
+
+      res.status(200).json(response);
+    } catch (error: any) {
+      logger.error(`Error suggesting tags: ${error}`);
+
+      res.status(500).json({
+        error: "Failed to suggest tags",
+        message: error.message || "Internal server error",
+      });
+    }
   }
 );
 

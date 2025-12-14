@@ -62,107 +62,83 @@ router.post(
       const body = (req as any).validated as CreatePanoramaImageRequest;
       const { key, name, fileSize, mimeType, description, tags } = body;
 
-      // Extract filename from S3 key (last segment after last '/')
       const filename = key.split("/").pop() || key;
 
-    // Process tags: find existing or create new ones
-    const tagObjectIds: any[] = [];
-    if (tags && Array.isArray(tags) && tags.length > 0) {
-      // Deduplicate tag names (case-sensitive for creation, but we'll search case-insensitively)
-      const uniqueTagNames = Array.from(
-        new Set(tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0))
-      );
+      const tagObjectIds: any[] = [];
+      if (tags && Array.isArray(tags) && tags.length > 0) {
+        const uniqueTagNames = Array.from(
+          new Set(tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0))
+        );
 
-      for (const tagName of uniqueTagNames) {
-        try {
-          // Search for existing tag (case-insensitive)
-          const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          let existingTag = await Tag.findOne({
-            name: { $regex: new RegExp(`^${escapedTagName}$`, "i") },
-          });
-
-          if (!existingTag) {
-            // Create new tag with exact casing as provided
-            existingTag = new Tag({ name: tagName });
-            await existingTag.save();
-            logger.info(`Created new tag: ${tagName}`);
-          }
-
-          tagObjectIds.push(existingTag._id);
-        } catch (tagError: any) {
-          // Handle unique constraint error (race condition - tag was created by another request)
-          if (tagError.code === 11000 || tagError.name === "MongoServerError") {
-            // Tag already exists, find it again
+        for (const tagName of uniqueTagNames) {
+          try {
             const escapedTagName = tagName.replace(
               /[.*+?^${}()|[\]\\]/g,
               "\\$&"
             );
-            const foundTag = await Tag.findOne({
+            let existingTag = await Tag.findOne({
               name: { $regex: new RegExp(`^${escapedTagName}$`, "i") },
             });
-            if (foundTag) {
-              tagObjectIds.push(foundTag._id);
+
+            if (!existingTag) {
+              existingTag = new Tag({ name: tagName });
+              await existingTag.save();
+              logger.info(`Created new tag: ${tagName}`);
             }
-          } else {
+
+            tagObjectIds.push(existingTag._id);
+          } catch (tagError: any) {
             logger.error(`Error processing tag "${tagName}": ${tagError}`);
-            // Continue with other tags even if one fails
           }
         }
       }
-    }
 
-    // Create new PanoramaImage document
-    const panoramaImage = new PanoramaImage({
-      name: name.trim(),
-      filename,
-      filePath: key,
-      fileSize,
-      mimeType,
-      isBookmarked: false,
-      description: description?.trim(),
-      tags: tagObjectIds,
-    });
+      const panoramaImage = new PanoramaImage({
+        name: name.trim(),
+        filename,
+        filePath: key,
+        fileSize,
+        mimeType,
+        isBookmarked: false,
+        description: description?.trim(),
+        tags: tagObjectIds,
+      });
 
-    // Save to database
-    const savedImage = await panoramaImage.save();
+      const savedImage = await panoramaImage.save();
 
-    // Populate tags before converting to DTO
-    await savedImage.populate("tags");
+      await savedImage.populate("tags");
 
-    // Convert to DTO
-    const responseDto = new PanoramaImageItemDto(savedImage);
+      const responseDto = new PanoramaImageItemDto(savedImage);
 
-    logger.info(
-      `Created PanoramaImage with ID: ${savedImage._id}, filename: ${filename}`
-    );
+      logger.info(
+        `Created PanoramaImage with ID: ${savedImage._id}, filename: ${filename}`
+      );
 
-    res.status(201).json(responseDto);
-  } catch (error: any) {
-    logger.error(`Error creating PanoramaImage: ${error}`);
+      res.status(201).json(responseDto);
+    } catch (error: any) {
+      logger.error(`Error creating PanoramaImage: ${error}`);
 
-    // Handle duplicate filename error (unique constraint)
-    if (error.code === 11000 || error.name === "MongoServerError") {
-      return res.status(400).json({
-        error: "A PanoramaImage with this filename already exists.",
-        message: error.message,
+      if (error.code === 11000 || error.name === "MongoServerError") {
+        return res.status(400).json({
+          error: "A PanoramaImage with this filename already exists.",
+          message: error.message,
+        });
+      }
+
+      if (error.name === "ValidationError") {
+        return res.status(400).json({
+          error: "Validation error",
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        error: "Failed to create PanoramaImage",
+        message: error.message || "Internal server error",
       });
     }
-
-    // Handle validation errors
-    if (error.name === "ValidationError") {
-      return res.status(400).json({
-        error: "Validation error",
-        message: error.message,
-      });
-    }
-
-    // Generic server error
-    res.status(500).json({
-      error: "Failed to create PanoramaImage",
-      message: error.message || "Internal server error",
-    });
   }
-});
+);
 
 /**
  * @swagger
@@ -236,92 +212,80 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       const queryParams = (req as any).validated as SearchPanoramaImageQuery;
-      const {
-        page = 1,
-        limit = 10,
-        isBookmarked,
-        search,
-        tags,
-      } = queryParams;
+      const { page = 1, limit = 10, isBookmarked, search, tags } = queryParams;
 
-      // Build query
       const query: any = {};
 
-      // Filter by bookmark status
       if (isBookmarked !== undefined) {
         query.isBookmarked = isBookmarked;
       }
 
-    // Text search on name and description
-    if (search && search.trim().length > 0) {
-      const escapedSearchTerm = search
-        .trim()
-        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const searchRegex = new RegExp(escapedSearchTerm, "i");
-      query.$or = [
-        { name: { $regex: searchRegex } },
-        { description: { $regex: searchRegex } },
-      ];
-    }
-
-    // Filter by tags
-    if (tags && tags.length > 0) {
-      const tagNames = tags;
-      // Find Tag documents matching the tag names (case-insensitive)
-      const tagQueries = tagNames.map((tagName) => {
-        const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        return { name: { $regex: new RegExp(`^${escapedTagName}$`, "i") } };
-      });
-
-      const matchingTags = await Tag.find({
-        $or: tagQueries,
-      }).select("_id");
-
-      if (matchingTags.length > 0) {
-        const tagObjectIds = matchingTags.map((tag) => tag._id);
-        query.tags = { $in: tagObjectIds };
-      } else {
-        // No matching tags found, return empty result
-        query.tags = { $in: [] };
+      // Text search on name and description
+      if (search && search.trim().length > 0) {
+        const escapedSearchTerm = search
+          .trim()
+          .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const searchRegex = new RegExp(escapedSearchTerm, "i");
+        query.$or = [
+          { name: { $regex: searchRegex } },
+          { description: { $regex: searchRegex } },
+        ];
       }
+
+      // Filter by tags
+      if (tags && tags.length > 0) {
+        const tagNames = tags;
+        // Find Tag documents matching the tag names (case-insensitive)
+        const tagQueries = tagNames.map((tagName) => {
+          const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          return { name: { $regex: new RegExp(`^${escapedTagName}$`, "i") } };
+        });
+
+        const matchingTags = await Tag.find({
+          $or: tagQueries,
+        }).select("_id");
+
+        if (matchingTags.length > 0) {
+          const tagObjectIds = matchingTags.map((tag) => tag._id);
+          query.tags = { $in: tagObjectIds };
+        } else {
+          query.tags = { $in: [] };
+        }
+      }
+
+      const skip = (page - 1) * limit;
+
+      const [panoramaImages, total] = await Promise.all([
+        PanoramaImage.find(query)
+          .populate("tags")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        PanoramaImage.countDocuments(query),
+      ]);
+
+      const data = panoramaImages.map(
+        (image) => new PanoramaImageItemDto(image)
+      );
+
+      const response = new PanoramaImageListResponse(data, page, limit, total);
+
+      logger.info(
+        `PanoramaImage search completed: page=${page}, limit=${limit}, total=${total}, filters=${JSON.stringify(
+          query
+        )}`
+      );
+
+      res.status(200).json(response);
+    } catch (error: any) {
+      logger.error(`Error searching PanoramaImage: ${error}`);
+
+      res.status(500).json({
+        error: "Failed to search PanoramaImage",
+        message: error.message || "Internal server error",
+      });
     }
-
-    // Calculate skip value for pagination
-    const skip = (page - 1) * limit;
-
-    // Execute query with pagination and populate tags
-    const [panoramaImages, total] = await Promise.all([
-      PanoramaImage.find(query)
-        .populate("tags")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      PanoramaImage.countDocuments(query),
-    ]);
-
-    // Convert to DTOs
-    const data = panoramaImages.map((image) => new PanoramaImageItemDto(image));
-
-    // Create response
-    const response = new PanoramaImageListResponse(data, page, limit, total);
-
-    logger.info(
-      `PanoramaImage search completed: page=${page}, limit=${limit}, total=${total}, filters=${JSON.stringify(
-        query
-      )}`
-    );
-
-    res.status(200).json(response);
-  } catch (error: any) {
-    logger.error(`Error searching PanoramaImage: ${error}`);
-
-    // Generic server error
-    res.status(500).json({
-      error: "Failed to search PanoramaImage",
-      message: error.message || "Internal server error",
-    });
-  }
   }
 );
 
@@ -383,21 +347,18 @@ router.patch(
       const { id } = params;
       const { isBookmarked } = body;
 
-      // Find and update the PanoramaImage
       const panoramaImage = await PanoramaImage.findByIdAndUpdate(
         id,
         { isBookmarked },
         { new: true, runValidators: true }
       );
 
-      // Check if image was found
       if (!panoramaImage) {
         return res.status(404).json({
           error: "PanoramaImage not found.",
         });
       }
 
-      // Convert to DTO
       const responseDto = new PanoramaImageItemDto(panoramaImage);
 
       logger.info(
@@ -408,22 +369,6 @@ router.patch(
     } catch (error: any) {
       logger.error(`Error updating bookmark status: ${error}`);
 
-      // Handle invalid ObjectId format
-      if (error.name === "CastError" || error.kind === "ObjectId") {
-        return res.status(400).json({
-          error: "Invalid PanoramaImage ID format.",
-        });
-      }
-
-      // Handle validation errors
-      if (error.name === "ValidationError") {
-        return res.status(400).json({
-          error: "Validation error",
-          message: error.message,
-        });
-      }
-
-      // Generic server error
       res.status(500).json({
         error: "Failed to update bookmark status",
         message: error.message || "Internal server error",
@@ -489,7 +434,6 @@ router.get(
       const queryParams = (req as any).validated as AnalyticsQuery;
       const { startDate, endDate, period = "day" } = queryParams;
 
-      // Parse and validate dates using dayjs
       let startDateObj: Date | undefined;
       let endDateObj: Date | undefined;
 
@@ -497,7 +441,8 @@ router.get(
         const parsedStartDate = dayjs(startDate);
         if (!parsedStartDate.isValid()) {
           return res.status(400).json({
-            error: "Invalid 'startDate' format. Must be a valid ISO date string.",
+            error:
+              "Invalid 'startDate' format. Must be a valid ISO date string.",
           });
         }
         startDateObj = parsedStartDate.startOf("day").toDate();
@@ -513,7 +458,6 @@ router.get(
         endDateObj = parsedEndDate.endOf("day").toDate();
       }
 
-      // Validate date range
       if (
         startDateObj &&
         endDateObj &&
@@ -524,7 +468,6 @@ router.get(
         });
       }
 
-      // Build date format string based on period
       let dateFormatString: string;
       switch (period) {
         case "week":
@@ -539,10 +482,8 @@ router.get(
           break;
       }
 
-      // Build aggregation pipeline
       const pipeline: any[] = [];
 
-      // Match stage: filter by date range if provided
       const matchStage: any = {};
       if (startDateObj || endDateObj) {
         matchStage.createdAt = {};
@@ -555,7 +496,6 @@ router.get(
         pipeline.push({ $match: matchStage });
       }
 
-      // Group stage: group by date period and bookmark status
       pipeline.push({
         $group: {
           _id: {
@@ -606,12 +546,10 @@ router.get(
         },
       });
 
-      // Sort by date
       pipeline.push({
         $sort: { date: 1 },
       });
 
-      // Execute aggregation
       const aggregationResult = await PanoramaImage.aggregate(pipeline);
 
       let totalImages = 0;
@@ -655,7 +593,6 @@ router.get(
     } catch (error: any) {
       logger.error(`Error retrieving bookmark analytics: ${error}`);
 
-      // Generic server error
       res.status(500).json({
         error: "Failed to retrieve bookmark analytics",
         message: error.message || "Internal server error",

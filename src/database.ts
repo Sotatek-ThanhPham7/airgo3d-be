@@ -1,17 +1,14 @@
 import mongoose from "mongoose";
 import logger from "./logger";
 
-// Import models so they register with mongoose
-import "./models"; // assumes models/index.ts exports & registers models
+import "./models";
 
 const connectDB = async (): Promise<void> => {
   try {
     const mongoUri =
       process.env.MONGODB_URI || "mongodb://localhost:27017/airgo3d";
 
-    const options = {
-      // Remove deprecated options for mongoose 8.x
-    };
+    const options = {};
 
     await mongoose.connect(mongoUri, options);
 

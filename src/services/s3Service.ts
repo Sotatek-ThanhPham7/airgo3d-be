@@ -13,7 +13,6 @@ class S3Service {
   private defaultExpiry: number;
 
   constructor() {
-    // Validate required environment variables
     const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
     const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
     const region = process.env.AWS_REGION;
@@ -34,7 +33,6 @@ class S3Service {
       );
     }
 
-    // Initialize S3 client
     this.s3Client = new S3Client({
       region,
       credentials: {
@@ -126,6 +124,5 @@ class S3Service {
   }
 }
 
-// Export singleton instance
 const s3Service = new S3Service();
 export default s3Service;

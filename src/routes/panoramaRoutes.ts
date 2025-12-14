@@ -400,64 +400,63 @@ router.get("/analytics", async (req: Request, res: Response) => {
       },
     });
 
-    // TODO: Raw query instead of manually calc the summary
-    // pipeline.push({})
+    pipeline.push({
+      $group: {
+        _id: "$_id.date",
+        bookmarked: {
+          $sum: {
+            $cond: {
+              if: { $eq: ["$_id.isBookmarked", true] },
+              then: "$count",
+              else: 0,
+            },
+          },
+        },
+        unbookmarked: {
+          $sum: {
+            $cond: {
+              if: { $eq: ["$_id.isBookmarked", false] },
+              then: "$count",
+              else: 0,
+            },
+          },
+        },
+        total: { $sum: "$count" },
+      },
+    });
+
+    pipeline.push({
+      $project: {
+        date: "$_id",
+        _id: 0,
+        bookmarked: 1,
+        unbookmarked: 1,
+        total: 1,
+      },
+    });
 
     // Sort by date
     pipeline.push({
-      $sort: { "_id.date": 1 },
+      $sort: { date: 1 },
     });
 
     // Execute aggregation
     const aggregationResult = await PanoramaImage.aggregate(pipeline);
 
-    console.log({ aggregationResult });
-
-    // Transform aggregation results to time series format and calculate summary
-    const timeSeriesMap = new Map<
-      string,
-      { bookmarked: number; unbookmarked: number }
-    >();
+    let totalImages = 0;
     let bookmarkedCount = 0;
     let unbookmarkedCount = 0;
-
+    let bookmarkedPercentage = 0;
+    let unbookmarkedPercentage = 0;
     aggregationResult.forEach((item) => {
-      const date = item._id.date;
-      const isBookmarked = item._id.isBookmarked;
-      const count = item.count;
-
-      // Accumulate counts for summary
-      if (isBookmarked) {
-        bookmarkedCount += count;
-      } else {
-        unbookmarkedCount += count;
-      }
-
-      // Build time series map
-      if (!timeSeriesMap.has(date)) {
-        timeSeriesMap.set(date, { bookmarked: 0, unbookmarked: 0 });
-      }
-
-      const dateData = timeSeriesMap.get(date);
-      if (dateData) {
-        if (isBookmarked) {
-          dateData.bookmarked = count;
-        } else {
-          dateData.unbookmarked = count;
-        }
-      }
+      totalImages += item.total;
+      bookmarkedCount += item.bookmarked;
+      unbookmarkedCount += item.unbookmarked;
+      bookmarkedPercentage =
+        Math.round((bookmarkedCount / totalImages) * 100 * 100) / 100;
+      unbookmarkedPercentage =
+        Math.round((unbookmarkedCount / totalImages) * 100 * 100) / 100;
     });
-
-    // Calculate summary statistics
-    const totalImages = bookmarkedCount + unbookmarkedCount;
-    const bookmarkedPercentage =
-      totalImages > 0
-        ? Math.round((bookmarkedCount / totalImages) * 100 * 100) / 100
-        : 0;
-    const unbookmarkedPercentage =
-      totalImages > 0
-        ? Math.round((unbookmarkedCount / totalImages) * 100 * 100) / 100
-        : 0;
 
     const summary: BookmarkAnalyticsSummary = {
       totalImages,
@@ -467,22 +466,9 @@ router.get("/analytics", async (req: Request, res: Response) => {
       unbookmarkedPercentage,
     };
 
-    // Convert map to array and sort by date
-    const timeSeries: TimeSeriesDataPoint[] = Array.from(
-      timeSeriesMap.entries()
-    )
-      .map(([date, data]) => ({
-        date,
-        bookmarked: data.bookmarked,
-        unbookmarked: data.unbookmarked,
-        total: data.bookmarked + data.unbookmarked,
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    // Create response
     const response = new BookmarkAnalyticsResponse(
       summary,
-      timeSeries,
+      aggregationResult as unknown as TimeSeriesDataPoint[],
       period as string,
       startDateObj,
       endDateObj

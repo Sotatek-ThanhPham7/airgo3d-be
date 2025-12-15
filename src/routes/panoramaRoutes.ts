@@ -1,13 +1,9 @@
 import { Router, Request, Response } from "express";
+import { body, param, query } from "express-validator";
 import * as dayjsModule from "dayjs";
 const dayjs = dayjsModule as any;
 import PanoramaImage from "../models/PanoramaImage";
 import Tag from "../models/Tag";
-import { CreatePanoramaImageRequest } from "../dtos/CreatePanoramaImageRequest";
-import { BookmarkUpdateRequest } from "../dtos/BookmarkUpdateRequest";
-import { SearchPanoramaImageQuery } from "../dtos/SearchPanoramaImageQuery";
-import { AnalyticsQuery } from "../dtos/AnalyticsQuery";
-import { MongoIdParam } from "../dtos/MongoIdParam";
 import {
   PanoramaImageItemDto,
   PanoramaImageListResponse,
@@ -17,8 +13,8 @@ import {
   BookmarkAnalyticsSummary,
   TimeSeriesDataPoint,
 } from "../dtos/BookmarkAnalyticsResponse";
-import { validateRequest } from "../middleware/validation";
 import logger from "../logger";
+import { handleValidationErrors } from "../utils/validation";
 
 const router = Router();
 
@@ -56,11 +52,56 @@ const router = Router();
  */
 router.post(
   "/",
-  validateRequest(CreatePanoramaImageRequest, "body"),
+  [
+    body("key")
+      .isString()
+      .withMessage("key must be a string")
+      .notEmpty()
+      .withMessage("key must be a non-empty string"),
+    body("name")
+      .isString()
+      .withMessage("name must be a string")
+      .notEmpty()
+      .withMessage("name must be a non-empty string"),
+    body("fileSize")
+      .isNumeric()
+      .withMessage("fileSize must be a number")
+      .custom((value) => value >= 0)
+      .withMessage("fileSize must be a non-negative number"),
+    body("mimeType")
+      .isIn(["image/jpeg", "image/png", "image/jpg", "image/webp"])
+      .withMessage(
+        "mimeType must be one of: image/jpeg, image/png, image/jpg, image/webp"
+      ),
+    body("thumbnailPath")
+      .optional()
+      .isString()
+      .withMessage("thumbnailPath must be a string"),
+    body("description")
+      .optional()
+      .isString()
+      .withMessage("description must be a string"),
+    body("tags").optional().isArray().withMessage("tags must be an array"),
+    body("tags.*")
+      .optional()
+      .isString()
+      .withMessage("Each tag must be a string"),
+  ],
   async (req: Request, res: Response) => {
     try {
-      const body = (req as any).validated as CreatePanoramaImageRequest;
-      const { key, name, fileSize, mimeType, description, tags } = body;
+      if (handleValidationErrors(req, res)) {
+        return;
+      }
+
+      const {
+        key,
+        name,
+        fileSize,
+        mimeType,
+        thumbnailPath,
+        description,
+        tags,
+      } = req.body as any;
 
       const filename = key.split("/").pop() || key;
 
@@ -97,6 +138,7 @@ router.post(
         name: name.trim(),
         filename,
         filePath: key,
+        thumbnailPath,
         fileSize,
         mimeType,
         isBookmarked: false,
@@ -208,11 +250,61 @@ router.post(
  */
 router.get(
   "",
-  validateRequest(SearchPanoramaImageQuery, "query"),
+  [
+    query("page")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("page must be a positive integer")
+      .toInt(),
+    query("limit")
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .withMessage("limit must be between 1 and 100")
+      .toInt(),
+    query("isBookmarked")
+      .optional()
+      .isBoolean()
+      .withMessage("isBookmarked must be a boolean")
+      .toBoolean(),
+    query("search")
+      .optional()
+      .isString()
+      .withMessage("search must be a string"),
+    query("tags")
+      .optional()
+      .customSanitizer((value: any) => {
+        if (typeof value === "string") {
+          return value
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter((tag) => tag.length > 0);
+        }
+        if (Array.isArray(value)) {
+          return value
+            .map((tag) => String(tag).trim())
+            .filter((tag) => tag.length > 0);
+        }
+        return value;
+      })
+      .custom((value: any) => {
+        if (value === undefined) return true;
+        return Array.isArray(value);
+      })
+      .withMessage("tags must be an array"),
+  ],
   async (req: Request, res: Response) => {
     try {
-      const queryParams = (req as any).validated as SearchPanoramaImageQuery;
-      const { page = 1, limit = 10, isBookmarked, search, tags } = queryParams;
+      if (handleValidationErrors(req, res)) {
+        return;
+      }
+
+      const {
+        page = 1,
+        limit = 10,
+        isBookmarked,
+        search,
+        tags,
+      } = req.query as any;
 
       const query: any = {};
 
@@ -236,7 +328,7 @@ router.get(
       if (tags && tags.length > 0) {
         const tagNames = tags;
         // Find Tag documents matching the tag names (case-insensitive)
-        const tagQueries = tagNames.map((tagName) => {
+        const tagQueries = tagNames.map((tagName: string) => {
           const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
           return { name: { $regex: new RegExp(`^${escapedTagName}$`, "i") } };
         });
@@ -337,15 +429,21 @@ router.get(
  */
 router.patch(
   "/:id/bookmark",
-  validateRequest(MongoIdParam, "params"),
-  validateRequest(BookmarkUpdateRequest, "body"),
+  [
+    param("id").isMongoId().withMessage("id must be a valid MongoDB ObjectId"),
+    body("isBookmarked")
+      .isBoolean()
+      .withMessage("isBookmarked must be a boolean")
+      .toBoolean(),
+  ],
   async (req: Request, res: Response) => {
     try {
-      const validated = (req as any).validated as any;
-      const params = validated.params as MongoIdParam;
-      const body = validated.body as BookmarkUpdateRequest;
-      const { id } = params;
-      const { isBookmarked } = body;
+      if (handleValidationErrors(req, res)) {
+        return;
+      }
+
+      const { id } = req.params;
+      const { isBookmarked } = req.body as { isBookmarked: boolean };
 
       const panoramaImage = await PanoramaImage.findByIdAndUpdate(
         id,
@@ -428,11 +526,35 @@ router.patch(
  */
 router.get(
   "/analytics",
-  validateRequest(AnalyticsQuery, "query"),
+  [
+    query("startDate")
+      .optional()
+      .isISO8601()
+      .withMessage("startDate must be a valid ISO date string"),
+    query("endDate")
+      .optional()
+      .isISO8601()
+      .withMessage("endDate must be a valid ISO date string"),
+    query("period")
+      .optional()
+      .isIn(["day", "week", "month"])
+      .withMessage("period must be one of: day, week, month"),
+  ],
   async (req: Request, res: Response) => {
     try {
-      const queryParams = (req as any).validated as AnalyticsQuery;
-      const { startDate, endDate, period = "day" } = queryParams;
+      if (handleValidationErrors(req, res)) {
+        return;
+      }
+
+      const {
+        startDate,
+        endDate,
+        period = "day",
+      } = req.query as {
+        startDate?: string;
+        endDate?: string;
+        period?: "day" | "week" | "month";
+      };
 
       let startDateObj: Date | undefined;
       let endDateObj: Date | undefined;

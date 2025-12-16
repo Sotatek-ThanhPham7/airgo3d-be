@@ -21,7 +21,7 @@
     }
   ],
   "createdAt": {
-    "$date": "2025-12-15T16:34:54.645Z"
+    "$date": "2025-12-10T16:34:54.645Z"
   },
   "updatedAt": {
     "$date": "2025-12-15T16:34:54.645Z"
@@ -37,7 +37,7 @@
   "thumbnailPath": "thumbnails/1a529764-e3c5-4c73-9d4d-432343977fbe-building-thumb.jpg",
   "fileSize": 1444201,
   "mimeType": "image/jpeg",
-  "isBookmarked": false,
+  "isBookmarked": true,
   "name": "Ha Noi Construction",
   "tags": [
     {
@@ -46,10 +46,10 @@
   ],
   "description": "Sotatek street",
   "createdAt": {
-    "$date": "2025-12-15T16:35:36.175Z"
+    "$date": "2025-12-12T16:35:36.175Z"
   },
   "updatedAt": {
-    "$date": "2025-12-15T16:35:36.175Z"
+    "$date": "2025-12-16T02:34:21.809Z"
   },
   "__v": 0
 },
@@ -62,7 +62,7 @@
   "thumbnailPath": "thumbnails/da59e47c-a739-4abd-b8d6-978106ee6e47-indoor-thumb.jpg",
   "fileSize": 44750645,
   "mimeType": "image/jpeg",
-  "isBookmarked": false,
+  "isBookmarked": true,
   "name": "Indoor",
   "tags": [
     {
@@ -71,10 +71,10 @@
   ],
   "description": "Nope",
   "createdAt": {
-    "$date": "2025-12-15T16:36:07.281Z"
+    "$date": "2025-12-11T16:36:07.281Z"
   },
   "updatedAt": {
-    "$date": "2025-12-15T16:36:07.281Z"
+    "$date": "2025-12-16T08:10:34.982Z"
   },
   "__v": 0
 },
@@ -110,7 +110,160 @@
     "$date": "2025-12-15T16:38:43.704Z"
   },
   "updatedAt": {
-    "$date": "2025-12-15T16:38:43.704Z"
+    "$date": "2025-12-16T07:28:15.610Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6940c5c0e9f09ea75541925d"
+  },
+  "filename": "7d61bdd9-9e7f-4c43-9850-4868bbaf22fb-panorama-demo.png",
+  "filePath": "images/7d61bdd9-9e7f-4c43-9850-4868bbaf22fb-panorama-demo.png",
+  "thumbnailPath": "thumbnails/ed285a3c-6db6-4da1-b1ac-32f84c758165-panorama-demo-thumb.jpg",
+  "fileSize": 1876581,
+  "mimeType": "image/png",
+  "isBookmarked": false,
+  "name": "Discover",
+  "tags": [
+    {
+      "$oid": "6940c5c0e9f09ea75541925b"
+    }
+  ],
+  "createdAt": {
+    "$date": "2025-12-02T02:36:48.436Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-16T02:36:48.436Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6940dd2fe9f09ea7554192e1"
+  },
+  "filename": "93961c35-8e59-48bf-8170-72cfb1791457-_ (4).jpeg",
+  "filePath": "images/93961c35-8e59-48bf-8170-72cfb1791457-_ (4).jpeg",
+  "thumbnailPath": "thumbnails/52b5d2f7-f34c-47da-9168-5c8f476747f6-_ (4)-thumb.jpg",
+  "fileSize": 128490,
+  "mimeType": "image/jpeg",
+  "isBookmarked": true,
+  "name": "Pet",
+  "tags": [
+    {
+      "$oid": "6940dd2fe9f09ea7554192dc"
+    },
+    {
+      "$oid": "6940dd2fe9f09ea7554192df"
+    }
+  ],
+  "description": "Pet pintereset",
+  "createdAt": {
+    "$date": "2025-12-16T04:16:47.546Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-16T07:28:09.029Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6940dd47e9f09ea7554192ef"
+  },
+  "filename": "05c54930-b425-4971-b2b5-d5ba48778513-_ (3).jpeg",
+  "filePath": "images/05c54930-b425-4971-b2b5-d5ba48778513-_ (3).jpeg",
+  "thumbnailPath": "thumbnails/548ba922-6a18-408c-92e6-5fc96e094a32-_ (3)-thumb.jpg",
+  "fileSize": 78296,
+  "mimeType": "image/jpeg",
+  "isBookmarked": true,
+  "name": "Flower",
+  "tags": [
+    {
+      "$oid": "6940dd2fe9f09ea7554192df"
+    },
+    {
+      "$oid": "6940dd47e9f09ea7554192ed"
+    }
+  ],
+  "createdAt": {
+    "$date": "2025-12-16T04:17:11.015Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-16T04:18:13.737Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6940dd77e9f09ea755419301"
+  },
+  "filename": "90ee5575-2575-4d8d-befd-2675a4475e3c-_ (2).jpeg",
+  "filePath": "images/90ee5575-2575-4d8d-befd-2675a4475e3c-_ (2).jpeg",
+  "thumbnailPath": "thumbnails/92b5d6a5-73f7-4c61-a41b-8694ca98a1f1-_ (2)-thumb.jpg",
+  "fileSize": 147224,
+  "mimeType": "image/jpeg",
+  "isBookmarked": false,
+  "name": "A bunch of flowers",
+  "tags": [
+    {
+      "$oid": "6940dd47e9f09ea7554192ed"
+    }
+  ],
+  "createdAt": {
+    "$date": "2025-12-16T04:17:59.337Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-16T04:17:59.337Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6940dda9e9f09ea75541930f"
+  },
+  "filename": "58a315d4-2a7f-4d98-b18f-5764f48afea3-_.jpeg",
+  "filePath": "images/58a315d4-2a7f-4d98-b18f-5764f48afea3-_.jpeg",
+  "thumbnailPath": "thumbnails/09fdacee-0aa1-4e05-9743-6a980ad49ed1-_-thumb.jpg",
+  "fileSize": 301749,
+  "mimeType": "image/jpeg",
+  "isBookmarked": false,
+  "name": "Infinite",
+  "tags": [
+    {
+      "$oid": "6940dda9e9f09ea75541930d"
+    }
+  ],
+  "description": "just",
+  "createdAt": {
+    "$date": "2025-11-16T04:18:49.384Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-16T04:18:49.384Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6940ddcee9f09ea75541931c"
+  },
+  "filename": "886ba48a-8d23-4a16-88e6-7e83ae96c25d-_ (1).jpeg",
+  "filePath": "images/886ba48a-8d23-4a16-88e6-7e83ae96c25d-_ (1).jpeg",
+  "thumbnailPath": "thumbnails/37203228-250c-47a9-bd09-07b02ae02e0b-_ (1)-thumb.jpg",
+  "fileSize": 48942,
+  "mimeType": "image/jpeg",
+  "isBookmarked": false,
+  "name": "Palm Tree",
+  "tags": [
+    {
+      "$oid": "6940ddcee9f09ea75541931a"
+    }
+  ],
+  "description": "Chrismas Tree",
+  "createdAt": {
+    "$date": "2025-11-05T04:19:26.496Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-16T04:19:26.496Z"
   },
   "__v": 0
 }]

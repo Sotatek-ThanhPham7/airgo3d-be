@@ -15,6 +15,7 @@ import {
 } from "../dtos/BookmarkAnalyticsResponse";
 import logger from "../logger";
 import { handleValidationErrors } from "../utils/validation";
+import s3Service from "../services/s3Service";
 
 const router = Router();
 
@@ -717,6 +718,132 @@ router.get(
 
       res.status(500).json({
         error: "Failed to retrieve bookmark analytics",
+        message: error.message || "Internal server error",
+      });
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /api/panorama/{id}/download-url:
+ *   get:
+ *     summary: Generate a presigned URL for downloading a panorama image from S3
+ *     tags: [Panorama]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB document ID of the PanoramaImage
+ *         example: "507f1f77bcf86cd799439011"
+ *       - in: query
+ *         name: expiresIn
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Expiration time of the presigned URL in seconds (defaults to configured value)
+ *     responses:
+ *       200:
+ *         description: Presigned download URL generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 url:
+ *                   type: string
+ *                   description: Presigned S3 URL for downloading the image
+ *                 expiresIn:
+ *                   type: integer
+ *                   description: Expiration time in seconds
+ *       400:
+ *         description: Bad request - invalid parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: PanoramaImage not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get(
+  "/:id/download-url",
+  [
+    param("id").isMongoId().withMessage("id must be a valid MongoDB ObjectId"),
+    query("expiresIn")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("expiresIn must be a positive integer")
+      .toInt(),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      if (handleValidationErrors(req, res)) {
+        return;
+      }
+
+      const { id } = req.params;
+      const { expiresIn } = req.query as { expiresIn?: number };
+
+      const panoramaImage = await PanoramaImage.findById(id).lean();
+
+      if (!panoramaImage) {
+        return res.status(404).json({
+          error: "PanoramaImage not found.",
+        });
+      }
+
+      const key = panoramaImage.filePath;
+      const storedFilename = panoramaImage.filename;
+
+      const downloadFilename = storedFilename
+        ? storedFilename.slice(37)
+        : storedFilename;
+
+      if (!key) {
+        logger.error(
+          `PanoramaImage with ID ${id} does not have a valid filePath`
+        );
+        return res.status(500).json({
+          error: "Image file path is not configured correctly.",
+        });
+      }
+
+      const url = await s3Service.generatePresignedDownloadUrl(
+        key,
+        expiresIn,
+        downloadFilename
+      );
+
+      logger.info(
+        `Generated presigned download URL for PanoramaImage ID: ${id}, key: ${key}`
+      );
+
+      res.status(200).json({
+        url,
+        expiresIn:
+          expiresIn ||
+          parseInt(process.env.S3_PRESIGNED_URL_EXPIRY_SECONDS || "300", 10),
+      });
+    } catch (error: any) {
+      logger.error(
+        `Error generating presigned download URL for PanoramaImage: ${error}`
+      );
+
+      res.status(500).json({
+        error: "Failed to generate presigned download URL",
         message: error.message || "Internal server error",
       });
     }

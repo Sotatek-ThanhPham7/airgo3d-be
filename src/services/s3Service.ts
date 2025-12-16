@@ -94,17 +94,28 @@ class S3Service {
    * Generate a presigned URL for downloading a file from S3
    * @param key - The S3 object key (file path)
    * @param expiresIn - Optional expiration time in seconds (default: 5 minutes)
+   * @param downloadFilename - Optional filename to use in Content-Disposition
    * @returns Presigned URL string
    */
   async generatePresignedDownloadUrl(
     key: string,
-    expiresIn?: number
+    expiresIn?: number,
+    downloadFilename?: string
   ): Promise<string> {
     try {
-      const command = new GetObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-      });
+      const command = new GetObjectCommand(
+        Object.assign(
+          {
+            Bucket: this.bucketName,
+            Key: key,
+          },
+          downloadFilename
+            ? {
+                ResponseContentDisposition: `attachment; filename="${downloadFilename}"`,
+              }
+            : {}
+        )
+      );
 
       const expiry = expiresIn || this.defaultExpiry;
       const url = await getSignedUrl(this.s3Client, command, {

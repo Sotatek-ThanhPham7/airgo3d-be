@@ -3,7 +3,6 @@ export {
   PanoramaImageListResponse,
   PanoramaImageItemDto,
 } from "./PanoramaImageListResponse";
-export { CreatePanoramaImageRequest } from "./CreatePanoramaImageRequest";
 export {
   BookmarkAnalyticsResponse,
   BookmarkAnalyticsSummary,

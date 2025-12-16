@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IPanoramaImage extends Document {
   filename: string;
   filePath: string;
+  thumbnailPath?: string;
   fileSize: number; // in bytes
   mimeType: string;
   isBookmarked: boolean;
@@ -25,6 +26,10 @@ const PanoramaImageSchema: Schema = new Schema(
     filePath: {
       type: String,
       required: true,
+    },
+    thumbnailPath: {
+      type: String,
+      required: false,
     },
     fileSize: {
       type: Number,

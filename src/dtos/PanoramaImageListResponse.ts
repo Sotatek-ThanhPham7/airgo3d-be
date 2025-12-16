@@ -6,6 +6,7 @@ export class PanoramaImageItemDto {
   name: string;
   filename: string;
   filePath: string;
+  thumbnailPath?: string;
   s3Url?: string;
   fileSize: number;
   mimeType: string;
@@ -20,6 +21,7 @@ export class PanoramaImageItemDto {
     this.name = panoramaImage.name;
     this.filename = panoramaImage.filename;
     this.filePath = panoramaImage.filePath;
+    this.thumbnailPath = panoramaImage.thumbnailPath;
     this.s3Url = panoramaImage.s3Url;
     this.fileSize = panoramaImage.fileSize;
     this.mimeType = panoramaImage.mimeType;

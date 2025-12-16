@@ -1,0 +1,116 @@
+[{
+  "_id": {
+    "$oid": "694038aeb3eaeed3acebe741"
+  },
+  "filename": "5c154e26-5ce2-46a3-b488-02fd307db8bf-sea.jpg",
+  "filePath": "images/5c154e26-5ce2-46a3-b488-02fd307db8bf-sea.jpg",
+  "thumbnailPath": "thumbnails/7606c2c4-bf1a-497b-a686-8c624f1aa1a8-sea-thumb.jpg",
+  "fileSize": 38667233,
+  "mimeType": "image/jpeg",
+  "isBookmarked": false,
+  "name": "Sea",
+  "tags": [
+    {
+      "$oid": "693eb2e41570911335ea2729"
+    },
+    {
+      "$oid": "693eb2d11570911335ea2728"
+    },
+    {
+      "$oid": "694038aeb3eaeed3acebe73f"
+    }
+  ],
+  "createdAt": {
+    "$date": "2025-12-15T16:34:54.645Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-15T16:34:54.645Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "694038d8b3eaeed3acebe74e"
+  },
+  "filename": "8fc1b99e-cbbc-4802-848e-4d972e3c8d9c-building.jpg",
+  "filePath": "images/8fc1b99e-cbbc-4802-848e-4d972e3c8d9c-building.jpg",
+  "thumbnailPath": "thumbnails/1a529764-e3c5-4c73-9d4d-432343977fbe-building-thumb.jpg",
+  "fileSize": 1444201,
+  "mimeType": "image/jpeg",
+  "isBookmarked": false,
+  "name": "Ha Noi Construction",
+  "tags": [
+    {
+      "$oid": "694038d8b3eaeed3acebe74c"
+    }
+  ],
+  "description": "Sotatek street",
+  "createdAt": {
+    "$date": "2025-12-15T16:35:36.175Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-15T16:35:36.175Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "694038f7b3eaeed3acebe75b"
+  },
+  "filename": "33fc4bb9-6206-41b7-983f-6ccc2b678607-indoor.jpg",
+  "filePath": "images/33fc4bb9-6206-41b7-983f-6ccc2b678607-indoor.jpg",
+  "thumbnailPath": "thumbnails/da59e47c-a739-4abd-b8d6-978106ee6e47-indoor-thumb.jpg",
+  "fileSize": 44750645,
+  "mimeType": "image/jpeg",
+  "isBookmarked": false,
+  "name": "Indoor",
+  "tags": [
+    {
+      "$oid": "694038f7b3eaeed3acebe759"
+    }
+  ],
+  "description": "Nope",
+  "createdAt": {
+    "$date": "2025-12-15T16:36:07.281Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-15T16:36:07.281Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "69403993b3eaeed3acebe774"
+  },
+  "filename": "53f4ebb6-ab32-46fd-a8a3-1601a25ac591-tranh-son-dau-sang-tac.jpg",
+  "filePath": "images/53f4ebb6-ab32-46fd-a8a3-1601a25ac591-tranh-son-dau-sang-tac.jpg",
+  "thumbnailPath": "thumbnails/df2a73ed-9781-449f-9a1f-73c81f54e34f-tranh-son-dau-sang-tac-thumb.jpg",
+  "fileSize": 326383,
+  "mimeType": "image/jpeg",
+  "isBookmarked": false,
+  "name": "Oil Painting",
+  "tags": [
+    {
+      "$oid": "69403993b3eaeed3acebe766"
+    },
+    {
+      "$oid": "69403993b3eaeed3acebe769"
+    },
+    {
+      "$oid": "69403993b3eaeed3acebe76c"
+    },
+    {
+      "$oid": "69403993b3eaeed3acebe76f"
+    },
+    {
+      "$oid": "69403993b3eaeed3acebe772"
+    }
+  ],
+  "createdAt": {
+    "$date": "2025-12-15T16:38:43.704Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-15T16:38:43.704Z"
+  },
+  "__v": 0
+}]

@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
+import { body } from "express-validator";
 import uuid = require("uuid");
 import s3Service from "../services/s3Service";
-import { PresignedUrlRequest } from "../dtos/PresignedUrlRequest";
-import { validateRequest } from "../middleware/validation";
 import logger from "../logger";
+import { handleValidationErrors } from "../utils/validation";
 
 const router = Router();
 
@@ -41,39 +41,62 @@ const router = Router();
  */
 router.post(
   "/presigned-url",
-  validateRequest(PresignedUrlRequest, "body"),
+  [
+    body("fileName")
+      .isString()
+      .withMessage("fileName must be a string")
+      .notEmpty()
+      .withMessage("fileName is required"),
+    body("contentType")
+      .isString()
+      .withMessage("contentType must be a string")
+      .notEmpty()
+      .withMessage("contentType is required"),
+    body("prefix").optional().isString().withMessage("prefix must be a string"),
+  ],
   async (req: Request, res: Response) => {
     try {
-      const body = (req as any).validated as PresignedUrlRequest;
-      const { contentType, prefix = "images", fileName } = body;
+      if (handleValidationErrors(req, res)) {
+        return;
+      }
 
-    const generatedUuid = uuid.v4();
-    const key = `${prefix}/${generatedUuid}-${fileName}`;
+      const {
+        contentType,
+        prefix = "images",
+        fileName,
+      } = req.body as {
+        contentType: string;
+        prefix?: string;
+        fileName: string;
+      };
 
-    const expiresIn = parseInt(
-      process.env.S3_PRESIGNED_URL_EXPIRY_SECONDS || "300",
-      10
-    );
+      const generatedUuid = uuid.v4();
+      const key = `${prefix}/${generatedUuid}-${fileName}`;
 
-    // for Put only
-    const url = await s3Service.generatePresignedUploadUrl(
-      key,
-      contentType,
-      expiresIn
-    );
+      const expiresIn = parseInt(
+        process.env.S3_PRESIGNED_URL_EXPIRY_SECONDS || "300",
+        10
+      );
 
-    res.status(200).json({
-      url,
-      key,
-      expiresIn,
-    });
-  } catch (error: any) {
-    logger.error(`Error in presigned-url endpoint: ${error}`);
-    res.status(500).json({
-      error: "Failed to generate presigned URL",
-      message: error.message || "Internal server error",
-    });
-  }
+      // for Put only
+      const url = await s3Service.generatePresignedUploadUrl(
+        key,
+        contentType,
+        expiresIn
+      );
+
+      res.status(200).json({
+        url,
+        key,
+        expiresIn,
+      });
+    } catch (error: any) {
+      logger.error(`Error in presigned-url endpoint: ${error}`);
+      res.status(500).json({
+        error: "Failed to generate presigned URL",
+        message: error.message || "Internal server error",
+      });
+    }
   }
 );
 

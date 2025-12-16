@@ -1,9 +1,9 @@
 import { Router, Request, Response } from "express";
+import { query } from "express-validator";
 import Tag from "../models/Tag";
-import { TagSearchQuery } from "../dtos/TagSearchQuery";
 import { TagListResponse, TagItemDto } from "../dtos/TagListResponse";
-import { validateRequest } from "../middleware/validation";
 import logger from "../logger";
+import { handleValidationErrors } from "../utils/validation";
 
 const router = Router();
 
@@ -60,11 +60,26 @@ const router = Router();
  */
 router.get(
   "/suggest",
-  validateRequest(TagSearchQuery, "query"),
+  [
+    query("q").optional().isString().withMessage("q must be a string"),
+    query("page")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("page must be a positive integer")
+      .toInt(),
+    query("limit")
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .withMessage("limit must be between 1 and 100")
+      .toInt(),
+  ],
   async (req: Request, res: Response) => {
     try {
-      const queryParams = (req as any).validated as TagSearchQuery;
-      const { page = 1, limit = 10, q } = queryParams;
+      if (handleValidationErrors(req, res)) {
+        return;
+      }
+
+      const { page = 1, limit = 10, q } = req.query as any;
 
       const query: any = {};
 

@@ -51,6 +51,12 @@ const options: swaggerJsdoc.Options = {
               description: "File size in bytes",
               example: 2048000,
             },
+            thumbnailPath: {
+              type: "string",
+              description:
+                "Optional S3 object key/path for a pre-generated thumbnail image",
+              example: "thumbnails/panorama-123-thumb.jpg",
+            },
             mimeType: {
               type: "string",
               enum: ["image/jpeg", "image/png", "image/jpg", "image/webp"],
@@ -91,6 +97,12 @@ const options: swaggerJsdoc.Options = {
             filePath: {
               type: "string",
               example: "images/panorama-123.jpg",
+            },
+            thumbnailPath: {
+              type: "string",
+              description:
+                "S3 object key/path for a lightweight thumbnail image (used for rendering in UI)",
+              example: "thumbnails/panorama-123-thumb.jpg",
             },
             s3Url: {
               type: "string",

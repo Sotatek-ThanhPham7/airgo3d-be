@@ -82,11 +82,22 @@ router.post(
       .optional()
       .isString()
       .withMessage("description must be a string"),
-    body("tags").optional().isArray().withMessage("tags must be an array"),
-    body("tags.*")
+    body("existingTags")
+      .optional()
+      .isArray()
+      .withMessage("existingTags must be an array"),
+    body("existingTags.*")
+      .optional()
+      .isMongoId()
+      .withMessage("Each existingTag must be a valid MongoDB ObjectId"),
+    body("newTags")
+      .optional()
+      .isArray()
+      .withMessage("newTags must be an array"),
+    body("newTags.*")
       .optional()
       .isString()
-      .withMessage("Each tag must be a string"),
+      .withMessage("Each newTag must be a string"),
   ],
   async (req: Request, res: Response) => {
     try {
@@ -101,15 +112,20 @@ router.post(
         mimeType,
         thumbnailPath,
         description,
-        tags,
+        existingTags,
+        newTags,
       } = req.body as any;
 
       const filename = key.split("/").pop() || key;
 
-      const tagObjectIds: any[] = [];
-      if (tags && Array.isArray(tags) && tags.length > 0) {
+      const newTagIds: any[] = [];
+      if (newTags && Array.isArray(newTags) && newTags.length > 0) {
         const uniqueTagNames = Array.from(
-          new Set(tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0))
+          new Set(
+            newTags
+              .map((tag) => String(tag).trim())
+              .filter((tag) => tag.length > 0)
+          )
         );
 
         for (const tagName of uniqueTagNames) {
@@ -118,22 +134,28 @@ router.post(
               /[.*+?^${}()|[\]\\]/g,
               "\\$&"
             );
-            let existingTag = await Tag.findOne({
+            let tag = await Tag.findOne({
               name: { $regex: new RegExp(`^${escapedTagName}$`, "i") },
             });
 
-            if (!existingTag) {
-              existingTag = new Tag({ name: tagName });
-              await existingTag.save();
+            if (!tag) {
+              tag = new Tag({ name: tagName });
+              await tag.save();
               logger.info(`Created new tag: ${tagName}`);
+            } else {
+              logger.info(
+                `Tag "${tagName}" already exists, using existing tag ID: ${tag._id}`
+              );
             }
 
-            tagObjectIds.push(existingTag._id);
+            newTagIds.push(tag._id);
           } catch (tagError: any) {
-            logger.error(`Error processing tag "${tagName}": ${tagError}`);
+            logger.error(`Error processing new tag "${tagName}": ${tagError}`);
           }
         }
       }
+
+      const allTagIds = [...existingTags, ...newTagIds];
 
       const panoramaImage = new PanoramaImage({
         name: name.trim(),
@@ -144,7 +166,7 @@ router.post(
         mimeType,
         isBookmarked: false,
         description: description?.trim(),
-        tags: tagObjectIds,
+        tags: allTagIds,
       });
 
       const savedImage = await panoramaImage.save();
@@ -274,12 +296,6 @@ router.get(
     query("tags")
       .optional()
       .customSanitizer((value: any) => {
-        if (typeof value === "string") {
-          return value
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter((tag) => tag.length > 0);
-        }
         if (Array.isArray(value)) {
           return value
             .map((tag) => String(tag).trim())
